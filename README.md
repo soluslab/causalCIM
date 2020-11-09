@@ -1,4 +1,4 @@
 # causalCIM
-A Python package for learning and using causal networks via discrete geometry
+Python code for learning and using causal networks via discrete geometry.
 
-This package is currently underconstruction.  Come back later!
+This package is currently under construction.  Please, come back later, to try it out!
