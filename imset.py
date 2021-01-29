@@ -4,13 +4,19 @@
 # ### Imset
 # 
 # This code is for calculating characteristic 
-# imsets of DAG-models. Thruout the term imset
-# is used for short as charachteristic imset. 
+# imsets of DAG-models. Throughout the term imset
+# is used for short as characteristic imset.
+# This is a (0,1)-vector encoding of a Markov
+# equivalence class of DAGs.
 # 
-# We also introduce the Greedy Imset Search (GIS)
-# and a couple of diffrerent variants of that. 
-# For example we have a breadth first search version
-# as well as a depth first. 
+# We implement the Greedy CIM algorithm for learning
+# BIC-optimal imsets.  We also implement a hybrid
+# version called skeletal greedy CIM which first learns
+# an undirected graph via CI-tests and then searches for
+# the BIC-optimal imset with the given skeleton.
+# We also implement a couple of different variants.
+# For example we have a breadth-first-search version
+# as well as a depth-first-search.
 
 
 # Import important modules
@@ -75,15 +81,15 @@ matplotlib.pyplot.style.use('classic')
 
 
 # Produce all sets of size 2 or greater in a list.
-# The return list is ordered in colexiographical order.
+# The return list is ordered in colexiographic order.
 # INPUT: a set
-# RETURNS: all sets of cardiality greater or equal to 2 as a list.
+# RETURNS: all sets of cardinality greater or equal to 2 as a list.
 def coordinatelist(input_set):
     assert(isinstance(input_set, set))
     size = len(input_set)
     ret = powerset(input_set)
     
-    # Can be rewritten to be more efficient, but is hardly worth it.
+    # Can be rewritten to be more efficient.
     temp_list = ret.copy()
     for i in input_set:
         ret.remove({i})
@@ -92,9 +98,9 @@ def coordinatelist(input_set):
     return ret
 
 # Produce all sets of size 2 and 3 in a list.
-# The return list is ordered in colexiographical order.
+# The return list is ordered in colexiographic order.
 # INPUT: a set
-# RETURNS: all sets of cardiality 2 or 3
+# RETURNS: all sets of cardinality 2 or 3
 def small_coordinatelist(input_set):
     assert(isinstance(input_set, set))
     
@@ -114,8 +120,8 @@ def small_coordinatelist(input_set):
     return ret
 
 
-# Produce the powerset as a list
-# The return list is ordered in colexiographical order.
+# Produce the power set as a list
+# The return list is ordered in colexiographic order.
 # INPUT: a set.
 # RETURNS: a list of all subsets.
 def powerset(input_set):
@@ -128,9 +134,9 @@ def powerset(input_set):
     return ret
 
 
-# Get the parentset and the children as sets instead of lists
+# Get the parent set and the children as sets instead of lists
 # INPUT: A directed graph and a node.
-# OUTPUTS: The paretset or the childset.
+# OUTPUTS: The parent set or the children set.
 
 def parents(input_graph, input_node):
     return set(input_graph.predecessors(input_node))
@@ -156,9 +162,9 @@ def imset_coordinate(input_graph, input_coordinate_set):
     return 0
 
 
-# Calls the coordinatelist function and calculates the imset value for each element.
+# Calls the coordinate list function and calculates the imset value for each element.
 # INPUT: a dag
-# OUTPUT: a list of lists. The inner lists concists of [set, imsetcoordinate(graph, set)]
+# OUTPUT: a list of lists. The inner lists consists of [set, imsetcoordinate(graph, set)]
 
 def imset(input_graph):
     assert (input_graph.is_dag())
@@ -172,7 +178,7 @@ def imset(input_graph):
 # Calls the smallcoordinatelist function and calculates the imset value for all elements of size 2 and 3.
 # Useful for checks where the full imset is not required ex. additions, buddings etc.
 # INPUT: a dag
-# OUTPUT: a list of lists. The inner lists concists of [set, imsetcoordinate(graph, set)]
+# OUTPUT: a list of lists. The inner lists consists of [set, imsetcoordinate(graph, set)]
 
 def small_imset(input_graph):
     assert (input_graph.is_dag())
@@ -209,7 +215,7 @@ def imset_cutof(input_imset, size = 3):
 
 
 # Function for turning a small_imset to a full sized imset.
-# Very slow, do not recomend using if it can be avoided.
+# Very slow, do not recommend using if it can be avoided.
 
 def small_imset2imset(input_imset):
     return imset(pdag2dag(small_imset2pdag(input_imset)))
@@ -272,8 +278,8 @@ def pdag2dag(input_graph):
 # Takes a full size imset and constructs a pDAG based on 
 # the 2- and 3-sets and outputs said pDAG.
 # That graph is graphically equivalent to all graphs in the MEC.
-# Undirected edges are portrated by mutual edges.
-# Rasies ValueError if the 2- and 3-sets are not consistent with a DAG
+# Undirected edges are portrayed by mutual edges.
+# Raises ValueError if the 2- and 3-sets are not consistent with a DAG
 
 def imset2pdag(input_imset):
     if input_imset == []:
@@ -350,9 +356,9 @@ def imset2pdag(input_imset):
     return graph
 
 # Takes a small_imset and constructs a pDAG.
-# That graph is graphically equivalent to all graphs in the MEC.
-# Undirected edges are portrated by mutual edges.
-# Rasies ValueError if the small_imset is not consistent with a DAG
+# This graph is graphically equivalent to all graphs in the MEC.
+# Undirected edges are portrayed by mutual edges.
+# Raises ValueError if the small_imset is not consistent with a DAG
 # DOUBLE CHECK IF YOU DID THIS CORRECTLY
 
 def small_imset2pdag(input_imset):
@@ -501,12 +507,12 @@ def imset_value(input_imset, input_set, full_imset = False, small_imset = False)
     return -1
     
 
-# A check to see wether two lists contains the 
+# A check to see whether or not two lists contains the
 # same elements regardless of order. Use only 
 # when elements are unhashable and unsortable 
 # (for example, sets).
 # INPUT: 2 lists.
-# RETURNS: A boolean stating wether they contain the same elements.
+# RETURNS: A boolean stating whether they contain the same elements.
 
 def set_lists_equal(input_list1, input_list2):
     copy1 = input_list1.copy()
@@ -546,9 +552,9 @@ def is_equal(input_imset1, input_imset2):
     return False
 
 
-# Returns whether the pair (graph1, graph2) is an addition.
+# Returns whether or not the pair (graph1, graph2) is an addition.
 # Can take both graphs and imsets as inputs
-# INPUT: Two gaphs/imsets (full size imsets only)
+# INPUT: Two graphs/imsets (full size imsets only)
 # OUTPUTS: A boolean
 
 def is_addition(input_graph1, input_graph2):
@@ -569,10 +575,10 @@ def is_addition(input_graph1, input_graph2):
 
 
 
-# Returns whether the pair (graph1, graph2) is a budding.
+# Returns whether or not the pair (graph1, graph2) is a budding.
 # verbose option for debugging
 # Can take both graphs and imsets as inputs
-# INPUT: Two gaphs/imsets (full size imsets only)
+# INPUT: Two graphs/imsets (full size imsets only)
 # OUTPUTS: A boolean
 
 def is_budding(input_graph1, input_graph2, verbose = False):
@@ -590,12 +596,12 @@ def is_budding(input_graph1, input_graph2, verbose = False):
     # the non-empty one
     if len(A)+len(B) < 2:
         if verbose:
-            print("False beacuse 1") 
+            print("False because 1")
         return False
     if len(A) > 0:
         if len(B) > 0:
             if verbose:
-                print("False beacuse 2")
+                print("False because 2")
             return False
     else:
         A = B
@@ -605,7 +611,7 @@ def is_budding(input_graph1, input_graph2, verbose = False):
     for i in A:
         if len(i) < 3:
             if verbose:
-                print("False beacuse 3")
+                print("False because 3")
             return False
     # Find i, j and S*
     union_set = set()
@@ -616,7 +622,7 @@ def is_budding(input_graph1, input_graph2, verbose = False):
         intersection_set = intersection_set.intersection(i)
     if len(intersection_set) < 2 or len(intersection_set) > 3:
         if verbose:
-            print("False beacuse 4")
+            print("False because 4")
         return False
     nodei = -1
     nodej = -1
@@ -634,7 +640,7 @@ def is_budding(input_graph1, input_graph2, verbose = False):
             nodei = temp_list[0]
         else: 
             if verbose:
-                print("False beacuse 5")
+                print("False because 5")
             return False
         for i in union_set.difference(intersection_set):
             if imset_value(imset1, set({i, temp_list[1]})) == 0:
@@ -658,7 +664,7 @@ def is_budding(input_graph1, input_graph2, verbose = False):
                     break
         if nodei == -1:
             if verbose:
-                print("False beacuse 6")
+                print("False because 6")
             return False
     S = union_set.copy().difference({nodei, nodej})
     
@@ -682,7 +688,7 @@ def is_budding(input_graph1, input_graph2, verbose = False):
     for i in pow_set:
         if not imset_value(imset1, i.union({nodei})) == 1:
             if verbose: 
-                print("False beacuse 7", i.union({nodei}))
+                print("False because 7", i.union({nodei}))
             return False
     
     
@@ -698,14 +704,14 @@ def is_budding(input_graph1, input_graph2, verbose = False):
         return True
     
     if verbose: 
-        print("False beacuse default")
+        print("False because default")
     return False
 
 
-# Returns whether the pair (graph1, graph2) is a budding.
+# Returns whether or not the pair (graph1, graph2) is a budding.
 # verbose option for debugging
 # Can take both graphs and imsets as inputs
-# INPUT: Two gaphs/imsets (full size imsets only)
+# INPUT: Two graphs/imsets (full size imsets only)
 # OUTPUTS: A boolean
 
 def is_ges(input_graph1, input_graph2, verbose = False):
@@ -725,12 +731,12 @@ def is_ges(input_graph1, input_graph2, verbose = False):
     # the non-empty one
     if len(A)+len(B) < 2:
         if verbose:
-            print("False beacuse 1") 
+            print("False because 1")
         return False
     if len(A) > 0:
         if len(B) >0:
             if verbose:
-                print("False beacuse 2")
+                print("False because 2")
             return False
     else:
         A = B
@@ -742,7 +748,7 @@ def is_ges(input_graph1, input_graph2, verbose = False):
         if len(i) == 2:
             if edge[0] != -1:
                 if verbose:
-                    print("False beacuse differs by more than one 2-set")
+                    print("False because differs by more than one 2-set")
                 return False
             else:
                 temp_list = list(i)
@@ -750,7 +756,7 @@ def is_ges(input_graph1, input_graph2, verbose = False):
                 edge[1] = temp_list[1]
     if edge[0] == -1:
             if verbose:
-                print("False beacuse differs no 2-set")
+                print("False because differs no 2-set")
             return False
     
     union_set = set()
@@ -762,7 +768,7 @@ def is_ges(input_graph1, input_graph2, verbose = False):
         ges_set.append(i.union(set(edge)))
     if not set_lists_equal(ges_set, A):
         if verbose:
-            print("False beacuse 3")
+            print("False because 3")
         return False
     
     check = True
@@ -777,16 +783,16 @@ def is_ges(input_graph1, input_graph2, verbose = False):
     for i in pow_set:
         if imset_value(imset1, i.union({edge[1]})) == 0:
             if verbose:
-                print("False beacuse 3")
+                print("False because 3")
             return False
     
     return True
     
     
-# Returns whether the pair (graph1, graph2) is a flip.
+# Returns whether or not the pair (graph1, graph2) is a flip.
 # verbose option for debugging
 # Can take both graphs and imsets as options
-# INPUT: Two gaphs/imsets (full size imsets only)
+# INPUT: Two graphs/imsets (full size imsets only)
 # OUTPUTS: A boolean
 
 def is_flip(input_graph1, input_graph2, verbose = False):
@@ -803,7 +809,7 @@ def is_flip(input_graph1, input_graph2, verbose = False):
         print(A, B)
     if len(A) == 0 or len(B) == 0:
         if verbose: 
-            print("False beacuse 1")
+            print("False because 1")
         return False
     for i in A:
         if len(i) == 2:
@@ -828,7 +834,7 @@ def is_flip(input_graph1, input_graph2, verbose = False):
     
     if len(intersection_set) != 2:
         if verbose: 
-            print("False beacuse 3")
+            print("False because 3")
         return False
     
     ne_set = set()
@@ -959,7 +965,7 @@ def try_acyclic_orientation_help(input_graph, input_imsetlist):
         
 
 
-# Runs thrught all DAGs with a fixed number 
+# Runs over all DAGs with a fixed number
 # of nodes and calculates the imset for all of them. 
 # Notice that it will probably produce replicas of 
 # most imsets.
@@ -1140,7 +1146,7 @@ def rgraph2igraph(input_rgraph):
     return ret
     
 
-# Transform a gaussParDAG object as returned 
+# Transforms a gaussParDAG object as returned
 # from, for example, the pcalg ges function
 # into a igraph object.
 
@@ -1158,7 +1164,7 @@ def gaussParDAG2igraph(input_dag):
     return ret
     
 
-# Tranforms a igraph to a bn from the bnlearn
+# Transforms a igraph to a bn from the bnlearn
 # library. 
 
 def igraph2bn(input_graph):
@@ -1207,7 +1213,7 @@ def naive_search(input_imsetlist, input_BIC):
 
 # The greedy CIM algorithm. 
 # Has option showsteps to print the steps taken.
-# Can turn off the edge and/or the turn phase of the algoritm. 
+# Can turn off the edge and/or the turn phase of the algorithm.
 
 def gcim(input_BIC, input_graph = None, input_imset = None, showsteps = False, edge_phase = True, turn_phase = True):
     if isinstance(input_graph, igraph.Graph):
@@ -1244,10 +1250,10 @@ def gcim(input_BIC, input_graph = None, input_imset = None, showsteps = False, e
 
 # A phased version of the Greedy CIM. 
 # First only adds in edges and does a 
-# truning phase, then removes edges and 
-# truning phases.
+# turning phase, then removes edges and
+# turning phases.
 
-# Turnning phases on/off is not yet implemented.
+# Turning phases on/off is not yet implemented.
 
 def gcim_phased(input_BIC, input_graph = None, input_imset = None, showsteps = False):
     if isinstance(input_graph, igraph.Graph):
@@ -1290,7 +1296,7 @@ def gcim_phased(input_BIC, input_graph = None, input_imset = None, showsteps = F
 
 
 # Tries to do additions of the second kind.
-# Is not currently used for any algoritm.
+# Is not currently used for any algorithm.
 
 def try_2additions(input_imset, input_score, input_BIC, show_steps = False):
     ret = 0
@@ -1395,7 +1401,7 @@ def try_2additions_removals(input_imset, input_score, input_BIC, show_steps = Fa
 
 
 # Tries to do buddings. 
-# Is not currently used for any algoritm.
+# Is not currently used for any algorithm.
 
 def try_buddings(input_imset, input_score, input_BIC, show_steps = False):
     steps_taken = 0
@@ -1775,7 +1781,7 @@ def try_edges(input_imset, input_score, input_BIC, show_steps= False):
 
 # Two alternative versions of "try_edges". 
 # Only tries to add in edges. Used 
-# for phased versions of G-CIM. See 
+# for phased versions of greedy CIM. See
 # "try_edges" for more documentation.
 
 def try_edges_additions(input_imset, input_score, input_BIC, show_steps= False):
@@ -1830,7 +1836,7 @@ def try_edges_additions(input_imset, input_score, input_BIC, show_steps= False):
 
 # Two alternative versions of "try_edges". 
 # Only tries to remove edges. Used 
-# for phased versions of G-CIM. See 
+# for phased versions of greedy CIM. See
 # "try_edges" for more documentation.
 
 def try_edges_removals(input_imset, input_score, input_BIC, show_steps= False):
@@ -1887,8 +1893,9 @@ def try_edges_removals(input_imset, input_score, input_BIC, show_steps= False):
 # ### Breadth first
 # 
 # All functions in this section are the same
-# as the ones above with the exeption that they 
-# are breadth first. Thus they only take one step 
+# as the ones above with the exception that they
+# are breadth-first instead of depth-first.
+# Thus they only take one step
 # per pass (the one creating the best score).
 
 
@@ -1928,7 +1935,7 @@ def gcim_b(input_BIC, input_graph = None, input_imset = None, showsteps = False,
     return temp_imset, temp_score, total_steps   
 
 
-# A phased breadth first version of the 
+# A phased breadth-first version of
 # Greedy CIM. See 'gcim' for better 
 # documentation.
 
@@ -1975,7 +1982,7 @@ def gcim_phased_b(input_BIC, input_graph = None, input_imset = None, showsteps =
 
 
 
-# A breadth first version of 
+# A breadth-first version of
 # 'try_2additions'. 
 
 def try_2additions_b(input_imset, input_score, input_BIC, show_steps = False):
@@ -2012,7 +2019,7 @@ def try_2additions_b(input_imset, input_score, input_BIC, show_steps = False):
 
 
 
-# A breadth first version of 
+# A breadth-first version of
 # 'try_2additions' only adding 
 # edges.
 
@@ -2045,7 +2052,7 @@ def try_2additions_additions_b(input_imset, input_score, input_BIC, show_steps =
         print("2-addition:", current_score, "\n", imset2dag(current_imset))
     return current_imset, step_counter, current_score
 
-# A breadth first version of 
+# A breadth-first version of
 # 'try_2additions' only removing 
 # edges.
 
@@ -2079,7 +2086,7 @@ def try_2additions_removals_b(input_imset, input_score, input_BIC, show_steps = 
     return current_imset, step_counter, current_score
 
 
-# A breadth first version of 'try_edges'.
+# A breadth-first version of 'try_edges'.
 # As 'try_edges' is better comments, we 
 # refer to that function.
 
@@ -2135,7 +2142,7 @@ def try_edges_b(input_imset, input_score, input_BIC, show_steps= False):
 
 
 
-# A breadth first version of 'try_edges', 
+# A breadth-first version of 'try_edges',
 # where we only try to add in edges. 
 # As 'try_edges' is better comments, we 
 # refer to that function.
@@ -2189,7 +2196,7 @@ def try_edges_additions_b(input_imset, input_score, input_BIC, show_steps= False
     return current_imset, step_counter, current_score
     
 
-# A breadth first version of 'try_edges', 
+# A breadth-first version of 'try_edges',
 # where we only try to add in edges. 
 # As 'try_edges' is better comments, we 
 # refer to that function.
@@ -2244,7 +2251,7 @@ def try_edges_removals_b(input_imset, input_score, input_BIC, show_steps= False)
     
 
 
-# A breadth first version of 'try_edges', 
+# A breadth-first version of 'try_edges',
 # where we only try to add in edges. 
 # As 'try_turns' is better comments, we 
 # refer to that function.
