@@ -80,6 +80,12 @@ import re
 matplotlib.pyplot.style.use('classic')
 
 
+# For running greedySP
+import causaldag as cd
+import numpy as np
+from conditional_independence import MemoizedCI_Tester, partial_correlation_suffstat, partial_correlation_test
+
+
 # Produce all sets of size 2 or greater in a list.
 # The return list is ordered in colexiographic order.
 # INPUT: a set
@@ -1129,6 +1135,17 @@ def mmhc(input_BIC):
     ret = igraph.Graph.Adjacency(list(pmatrix))
     return ret
 
+
+# Run the implementation of greedySP from uhlerlab/causaldag
+
+def greedySP(input_data):
+    data_matrix = numpy.genfromtxt(input_data, delimiter=',')
+    nnodes = no_nodes[0]
+    suffstat = partial_correlation_suffstat(data_matrix)
+    ci_tester = MemoizedCI_Tester(partial_correlation_test, suffstat, alpha=1e-3)
+    est_dag = cd.sparsest_permutation(set(range(nnodes)), ci_tester, progress=True)
+    est_cpdag = est_dag.cpdag()
+    return igraph.Graph.Adjacency(est_cpdag.to_amat()[0])
 
 # Transform a python-igraph to a R-igraph 
 # object.
@@ -2351,7 +2368,7 @@ while (i < len(imsetlist)):
             j-=1;
         j+=1;
     i+=1;
-
+print(imsetlist)
 
 
 
@@ -2372,136 +2389,139 @@ dataset_path = "sim_data_nbh_final/alpha-"+str(alpha)+"/samples-"+str(samples_no
 
 # Initiate some variables
 # A sorted version of the alg_vector_choose to make coding easier
-alg_vector = ["ges", "pc", "mmhc", "gcim", "ges_gcim", "ske", "gcim_b", "gcim_phased_b", "opt", "true"]
+alg_vector = ["ges", "pc", "mmhc", "greedySP", "gis", "gies", "ges_gis", "ske", "gis_phased", "gis_backwards", "gis_b",
+              "gis_phased_b", "opt", "true"]
 alg_vector_copy = alg_vector.copy()
 for i in alg_vector_copy:
     if alg_vector_choose.count(i) == 0:
         alg_vector.remove(i)
 # Which algorithms to count the number of steps on
 step_count_alg = alg_vector.copy()
-for i in ["ges", "pc", "mmhc", "opt", "true"]:
+for i in ["ges", "gies", "pc", "mmhc", "opt", "true"]:
     try:
         step_count_alg.remove(i)
     except ValueError:
         pass
 
-
 # Print starting message
 print("Local clock:", time.asctime(time.localtime(time.time())))
 print("Testing with:")
 print("Algorithms:", alg_vector)
-print("From:", dataset_path+"nodes-"+str(no_nodes)+"/"+dataset_type+"-"+str(dataset_type_run))
-
+print("From:", dataset_path + "nodes-" + str(no_nodes) + "/" + dataset_type + "-" + str(dataset_type_run))
 
 for nodes in no_nodes:
     print("Starting testing with nodes: ", nodes)
-#     dataset_type_run = [i for i in range(1, nodes)]
     for run in dataset_type_run:
-        print("Starting testing with " + dataset_type +": " + str(run))
-        
+        print("Starting testing with " + dataset_type + ": " + str(run))
+
         # Score vectors to save the BIC score
         return_dags_vector = [alg_vector]
-        score_vector_ges = []
-        score_vector_pc = []
-        score_vector_mmhc = []
-        score_vector_gcim = []
-        score_vector_ges_gcim = []
-        score_vector_gcim_b = []
-        score_vector_gcim_phased_b = []
-        score_vector_true = []
-        score_vector_ske = []
-        score_vector_opt = []
-        
+        for algo in alg_vector:
+            exec("score_vector_" + algo + " = []")
+
         # Step vectors to get some extra data
-        step_vector_gcim = []
-        step_vector_ske = []
-        step_vector_gcim_b = []
-        step_vector_gcim_phased_b = []
-        step_vector_ges_gcim = []
-        
+        for algo in step_count_alg:
+            exec("step_vector_" + algo + " = []")
+
         # Shd vectors to save the shds
-        shd_vector_ges_opt = []
-        shd_vector_ges_true = []
-        shd_vector_pc_opt = []
-        shd_vector_pc_true = []
-        shd_vector_mmhc_opt = []
-        shd_vector_mmhc_true = []
-        shd_vector_gcim_opt = []
-        shd_vector_gcim_true = []
-        shd_vector_ges_gcim_opt = []
-        shd_vector_ges_gcim_true = []
-        shd_vector_ske_opt = []
-        shd_vector_ske_true = []
-        
-        shd_vector_opt_true = []
-        
-        print("[", end = "")
+        if alg_vector.count('opt') > 0:
+            for algo in alg_vector:
+                if algo != 'opt' and algo != 'true':
+                    exec("shd_vector_" + algo + "_opt = []")
+        if alg_vector.count('true') > 0:
+            for algo in alg_vector:
+                if algo != 'true':
+                    exec("shd_vector_" + algo + "_true = []")
+
+        # Run the algorithms
+        print("[", end="")
         progress_res = min(50, len(models_name))
-        progress_vector = [numpy.floor(i*len(models_name)/progress_res) for i in range(1, progress_res)]
+        progress_vector = [numpy.floor(i * len(models_name) / progress_res) for i in range(1, progress_res)]
         for no in range(len(models_name)):
             if no in progress_vector:
-                print("=", end = "")
-            BIC = initiate_BIC(dataset_path + "nodes-"+ str(nodes)+"/"+dataset_type+"-" +str(run)+ "/"+models_name[no])
+                print("=", end="")
+            DATA = dataset_path + "nodes-" + str(nodes) + "/" + dataset_type + "-" + str(run) + "/" + models_name[no]
+            BIC = initiate_BIC(
+                dataset_path + "nodes-" + str(nodes) + "/" + dataset_type + "-" + str(run) + "/" + models_name[no])
             step_count_vector_temp = []
+            # Do the 'gies'
+            if alg_vector.count('ges') > 0:
+                return_gies_dag = gaussParDAG2igraph(pcalg.ges(BIC)[1])
+                score_vector_gies.append(score_BIC(BIC, return_gies_dag))
             # Do the 'ges'
             if alg_vector.count('ges') > 0:
-                return_ges_dag = gaussParDAG2igraph(pcalg.ges(BIC)[1])
+                return_ges_dag = gaussParDAG2igraph(
+                    pcalg.ges(BIC, phase=rpy2.robjects.r['c']('forward', 'backward'), iterate=False)[1])
                 score_vector_ges.append(score_BIC(BIC, return_ges_dag))
             # Do the 'pc'
             pc_success = False
             if alg_vector.count('pc') > 0:
-                try:
-                    return_pc_dag = pc(BIC, input_cut_off= alpha)
-                    pc_success = True
-                    score_vector_pc.append(score_BIC(BIC, return_pc_dag))
-                except ValueError:
-                    pass
+                return_pc_dag = pc(BIC, input_cut_off=alpha)
+                score_vector_pc.append(score_BIC(BIC, return_pc_dag))
             # Do the 'mmhc'
             if alg_vector.count('mmhc') > 0:
                 return_mmhc_dag = mmhc(BIC)
                 score_vector_mmhc.append(score_BIC(BIC, return_mmhc_dag))
-            # Do the gcim
-            if alg_vector.count('gcim') > 0:
-                return_gcim = gcim(BIC)
-                return_gcim_dag = imset2dag(return_gcim[0])
-                score_vector_gcim.append(return_gcim[1])
-                step_vector_gcim.append(return_gcim[2])
-            # Do the skeletal 'gcim'
+            # Do greedySP
+            if alg_vector.count('greedySP') > 0:
+                return_greedySP_dag = greedySP(DATA)
+                score_vector_greedySP.append(score(BIC,return_greedySP_dag))
+            # Do the gis
+            if alg_vector.count('gis') > 0:
+                return_gis = gis(BIC)
+                return_gis_dag = imset2dag(return_gis[0])
+                score_vector_gis.append(return_gis[1])
+                step_vector_gis.append(return_gis[2])
+            # Do the skeletal 'gis'
             if alg_vector.count('ske') > 0:
-                skeleton_graph = skeleton(BIC, input_cut_off= alpha)
+                skeleton_graph = skeleton(BIC, input_cut_off=alpha)
                 try:
                     dir_graph = skeleton_graph.copy()
-                    dir_graph.to_directed(mutual = True)
+                    dir_graph.to_directed(mutual=True)
                     dir_graph = pdag2dag(dir_graph)
                 except ValueError:
                     dir_graph = skeleton_graph.copy()
-                    dir_graph.to_directed(mutual = False)
-                return_ske = gcim(BIC, input_graph = dir_graph, edge_phase= False)
+                    dir_graph.to_directed(mutual=False)
+                return_ske = gis(BIC, input_graph=dir_graph, edge_phase=False)
                 return_ske_dag = imset2dag(return_ske[0])
                 score_vector_ske.append(return_ske[1])
                 step_vector_ske.append(return_ske[2])
-            # Do the 'gcim_b')
-            if alg_vector.count('gcim_b') > 0:
-                return_gcim_b = gcim_b(BIC)
-                return_gcim_b_dag = imset2dag(return_gcim_b[0])
-                score_vector_gcim_b.append(return_gcim_b[1])
-                step_vector_gcim_b.append(return_gcim_b[2])
-            # Do the 'gcim_phased_b'
-            if alg_vector.count('gcim_phased_b') > 0:
-                return_gcim_phased_b = gcim_phased_b(BIC)
-                return_gcim_phased_b_dag = imset2dag(return_gcim_phased_b[0])
-                score_vector_gcim_phased_b.append(return_gcim_phased_b[1])
-                step_vector_gcim_phased_b.append(return_gcim_phased_b[2])
-            # Do the 'ges_gcim'
-            if alg_vector.count('ges_gcim') > 0:
+            # Do the 'gis_b')
+            if alg_vector.count('gis_b') > 0:
+                return_gis_b = gis_b(BIC)
+                return_gis_b_dag = imset2dag(return_gis_b[0])
+                score_vector_gis_b.append(return_gis_b[1])
+                step_vector_gis_b.append(return_gis_b[2])
+            # Do the 'gis_phased'
+            if alg_vector.count('gis_phased') > 0:
+                return_gis_phased = gis_phased(BIC)
+                return_gis_phased_dag = imset2dag(return_gis_phased[0])
+                score_vector_gis_phased.append(return_gis_phased[1])
+                step_vector_gis_phased.append(return_gis_phased[2])
+            # Do the 'gis_backwards'
+            if alg_vector.count('gis_backwards') > 0:
+                initial_graph_gis_backwards = igraph.Graph.Full(nodes)
+                initial_graph_gis_backwards.to_directed(mutual=False)
+                return_gis_backwards = gis(BIC, initial_graph_gis_backwards)
+                return_gis_backwards_dag = imset2dag(return_gis_backwards[0])
+                score_vector_gis_backwards.append(return_gis_backwards[1])
+                step_vector_gis_backwards.append(return_gis_backwards[2])
+            # Do the 'gis_phased_b'
+            if alg_vector.count('gis_phased_b') > 0:
+                return_gis_phased_b = gis_phased_b(BIC)
+                return_gis_phased_b_dag = imset2dag(return_gis_phased_b[0])
+                score_vector_gis_phased_b.append(return_gis_phased_b[1])
+                step_vector_gis_phased_b.append(return_gis_phased_b[2])
+            # Do the 'ges_gis'
+            if alg_vector.count('ges_gis') > 0:
                 if alg_vector.count('ges') > 0:
-                    initial_imset_ges_gcim = imset(return_ges_dag)
+                    initial_imset_ges_gis = imset(return_ges_dag)
                 else:
-                    initial_imset_ges_gcim = imset(gaussParDAG2igraph(pcalg.ges(BIC)[1]))
-                return_ges_gcim = gcim(BIC, input_imset=initial_imset_ges_gcim)
-                return_ges_gcim_dag = imset2dag(return_ges_gcim[0])
-                score_vector_ges_gcim.append(return_ges_gcim[1])
-                step_vector_ges_gcim.append(return_ges_gcim[2])
+                    initial_imset_ges_gis = imset(gaussParDAG2igraph(pcalg.ges(BIC)[1]))
+                return_ges_gis = gis(BIC, input_imset=initial_imset_ges_gis)
+                return_ges_gis_dag = imset2dag(return_ges_gis[0])
+                score_vector_ges_gis.append(return_ges_gis[1])
+                step_vector_ges_gis.append(return_ges_gis[2])
             # Do the 'naive_search' (opt)
             if alg_vector.count('opt') > 0:
                 return_opt = naive_search(imsetlist, BIC)
@@ -2509,336 +2529,576 @@ for nodes in no_nodes:
                 score_vector_opt.append(return_opt[1])
             # Do the 'true'
             if alg_vector.count('true') > 0:
-                return_true_dag = read_dag(dataset_path + "nodes-"+ str(nodes)+"/"+dataset_type+"-" +str(run)+ "/"+graph_name[no])
+                return_true_dag = read_dag(
+                    dataset_path + "nodes-" + str(nodes) + "/" + dataset_type + "-" + str(run) + "/" + graph_name[no])
                 return_true_score = score_BIC(BIC, return_true_dag)
                 score_vector_true.append(return_true_score)
-            
+
             # Calculate the shd_vectors
-            if alg_vector.count('ges') > 0 and alg_vector.count('opt') > 0:
-                shd_vector_ges_opt.append(shd(return_ges_dag, return_opt_dag))
-            if alg_vector.count('ges') > 0 and alg_vector.count('true') > 0:
-                shd_vector_ges_true.append(shd(return_ges_dag, return_true_dag))
-            if alg_vector.count('pc') > 0 and alg_vector.count('opt') > 0:
-                if pc_success:
-                    shd_vector_pc_opt.append(shd(return_pc_dag, return_opt_dag))
-                else:
-                    shd_vector_pc_opt.append(-1)
-            if alg_vector.count('pc') > 0 and alg_vector.count('true') > 0:
-                shd_vector_pc_true.append(shd(return_pc_dag, return_true_dag))
-            if alg_vector.count('mmhc') > 0 and alg_vector.count('opt') > 0:
-                shd_vector_mmhc_opt.append(shd(return_mmhc_dag, return_opt_dag))
-            if alg_vector.count('mmhc') > 0 and alg_vector.count('true') > 0:
-                shd_vector_mmhc_true.append(shd(return_mmhc_dag, return_true_dag))
-            if alg_vector.count('gcim') > 0 and alg_vector.count('opt') > 0:
-                shd_vector_gcim_opt.append(shd(return_gcim_dag, return_opt_dag))
-            if alg_vector.count('gcim') > 0 and alg_vector.count('true') > 0:
-                shd_vector_gcim_true.append(shd(return_gcim_dag, return_true_dag))
-            if alg_vector.count('ske') > 0 and alg_vector.count('opt') > 0:
-                shd_vector_ske_opt.append(shd(return_ske_dag, return_opt_dag))
-            if alg_vector.count('ske') > 0 and alg_vector.count('true') > 0:
-                shd_vector_ske_true.append(shd(return_ske_dag, return_true_dag))
-            if alg_vector.count('ges_gcim') > 0 and alg_vector.count('opt') > 0:
-                shd_vector_ges_gcim_opt.append(shd(return_ges_gcim_dag, return_opt_dag))
-            if alg_vector.count('ges_gcim') > 0 and alg_vector.count('true') > 0:
-                shd_vector_ges_gcim_true.append(shd(return_ges_gcim_dag, return_true_dag))
-            if alg_vector.count('opt') > 0 and alg_vector.count('true') > 0:
-                shd_vector_opt_true.append(shd(return_opt_dag, return_true_dag))
-            
-            # Save the dags as edgelists for future reference
-            return_dags_vector_temp = []
-            if alg_vector.count('ges') > 0:
-                return_dags_vector_temp.append(return_ges_dag.get_edgelist())
-            if alg_vector.count('pc') > 0:
-                if pc_success:
-                    return_dags_vector_temp.append(return_pc_dag.get_edgelist())
-                else:
-                    return_dags_vector_temp.append(None)
-            if alg_vector.count('mmhc') > 0:
-                return_dags_vector_temp.append(return_mmhc_dag.get_edgelist())
-            if alg_vector.count('gcim') > 0:
-                return_dags_vector_temp.append(return_gcim_dag.get_edgelist())
-            if alg_vector.count('ges_gcim') > 0:
-                return_dags_vector_temp.append(return_ges_gcim_dag.get_edgelist())
-            if alg_vector.count('ske') > 0:
-                return_dags_vector_temp.append(return_ske_dag.get_edgelist())
-            if alg_vector.count('gcim_b') > 0:
-                return_dags_vector_temp.append(return_gcim_b_dag.get_edgelist())
-            if alg_vector.count('gcim_phased_b') > 0:
-                return_dags_vector_temp.append(return_gcim_phased_b_dag.get_edgelist())
             if alg_vector.count('opt') > 0:
-                return_dags_vector_temp.append(return_opt_dag.get_edgelist())
+                for algo in alg_vector:
+                    if algo != 'opt' and algo != 'true':
+                        eval("shd_vector_" + algo + "_opt.append(shd(return_" + algo + "_dag, return_opt_dag))")
             if alg_vector.count('true') > 0:
-                return_dags_vector_temp.append(return_true_dag.get_edgelist())
-            
+                for algo in alg_vector:
+                    if algo != 'true':
+                        eval("shd_vector_" + algo + "_true.append(shd(return_" + algo + "_dag, return_true_dag))")
+
+            # Save the dags as edgelists for future reference
+            return_dags_vector_temp = []  # ["ges", "pc", "mmhc", "gis", "ges_gis", "ske", "gis_phased", "gis_b", "gis_phased_b", "opt", "true"]
+            for algo in alg_vector:
+                return_dags_vector_temp.append(eval("return_" + algo + "_dag.get_edgelist()"))
+
             return_dags_vector.append(return_dags_vector_temp)
         print("]")
-        # Write the results to a results.txt file.            
-        result_file = open(dataset_path + "nodes-"+ str(nodes)+"/"+dataset_type+"-" +str(run)+ "/results.txt", "w")
+
+        # Write the results to a results.txt file.
+        result_file = open(dataset_path + "nodes-" + str(nodes) + "/" + dataset_type + "-" + str(run) + "/results.txt",
+                           "w")
+
         # Write what data we used
-        result_file.write("Number of nodes="+str(nodes)+"\n")
-        result_file.write("Number of samples="+str(samples_no)+"\n")
-        result_file.write("Cut of limit used="+str(alpha)+"\n")
+        result_file.write("Number of nodes=" + str(nodes) + "\n")
+        result_file.write("Number of samples=" + str(samples_no) + "\n")
+        result_file.write("Cut of limit used=" + str(alpha) + "\n")
+
         # Write the total BIC score
-        if alg_vector.count('ges') > 0:
-            result_file.write("total_score_ges="+ str(sum(score_vector_ges))+ "\n")
-        if alg_vector.count('pc') > 0:
-            result_file.write("total_score_pc="+ str(sum(score_vector_pc))+ "\n")
-        if alg_vector.count('mmhc') > 0:
-            result_file.write("total_score_mmhc="+ str(sum(score_vector_mmhc))+ "\n")
-        if alg_vector.count('gcim') > 0:
-            result_file.write("total_score_gcim="+ str(sum(score_vector_gcim))+ "\n")
-        if alg_vector.count('ges_gcim') > 0:
-            result_file.write("total_score_ges_gcim="+ str(sum(score_vector_ges_gcim))+ "\n")
-        if alg_vector.count('ske') > 0:
-            result_file.write("total_score_ske="+ str(sum(score_vector_ske))+ "\n")
-        if alg_vector.count('gcim_b') > 0:
-            result_file.write("total_score_gcim_b="+str(sum(score_vector_gcim_b)))
-        if alg_vector.count('gcim_phased_b') > 0:
-            result_file.write("total_score_gcim_phased_b="+ str(sum(score_vector_gcim_phased_b))+ "\n")
-        if alg_vector.count('opt') > 0:
-            result_file.write("total_score_opt="+ str(sum(score_vector_opt))+ "\n")
-        if alg_vector.count('true') > 0:
-            result_file.write("total_score_true="+ str(sum(score_vector_true))+ "\n")
-        
+        for algo in alg_vector:
+            result_file.write("total_score_" + algo + "=" + str(sum(eval("score_vector_" + algo))) + "\n")
+
         # Write the shd to file
-        if len(shd_vector_ges_opt) > 0:
-            result_file.write("shd dist ges to opt="+ str(shd_vector_ges_opt)+ "\n")
-        if len(shd_vector_ges_true) > 0:
-            result_file.write("shd dist ges to true="+ str(shd_vector_ges_true)+ "\n")
-        if len(shd_vector_pc_opt) > 0:
-            result_file.write("shd dist pc to opt="+ str(shd_vector_pc_opt)+ "\n")
-        if len(shd_vector_pc_true) > 0:
-            result_file.write("shd dist pc to true="+ str(shd_vector_pc_true)+ "\n")
-        if len(shd_vector_mmhc_opt) > 0:
-            result_file.write("shd dist mmhc to opt="+ str(shd_vector_mmhc_opt)+ "\n")
-        if len(shd_vector_mmhc_true) > 0:
-            result_file.write("shd dist mmhc to true="+ str(shd_vector_mmhc_true)+ "\n")
-        if len(shd_vector_gcim_opt) > 0:
-            result_file.write("shd dist gcim to opt="+ str(shd_vector_gcim_opt)+ "\n")
-        if len(shd_vector_gcim_true) > 0:
-            result_file.write("shd dist gcim to true="+ str(shd_vector_gcim_true)+ "\n")
-        if len(shd_vector_ges_gcim_opt) > 0:
-            result_file.write("shd dist ges_gcim to opt="+ str(shd_vector_ges_gcim_opt)+ "\n")
-        if len(shd_vector_ges_gcim_true) > 0:
-            result_file.write("shd dist ges_gcim to true="+ str(shd_vector_ges_gcim_true)+ "\n")
-        if len(shd_vector_ske_opt) > 0:
-            result_file.write("shd dist ske to opt="+ str(shd_vector_ske_opt)+ "\n")
-        if len(shd_vector_ske_true) > 0:
-            result_file.write("shd dist ske to true="+ str(shd_vector_ske_true)+ "\n")
-        if len(shd_vector_opt_true) > 0:
-            result_file.write("shd dist opt to true="+ str(shd_vector_opt_true)+ "\n")
+        if alg_vector.count('opt') > 0:
+            for algo in alg_vector:
+                if algo != 'opt' and algo != 'true':
+                    result_file.write("shd dist " + algo + " to opt=" + str(eval("shd_vector_" + algo + "_opt") + "\n"))
+        if alg_vector.count('true') > 0:
+            for algo in alg_vector:
+                if algo != 'true':
+                    result_file.write(
+                        "shd dist " + algo + " to true=" + str(eval("shd_vector_" + algo + "_true")) + "\n")
+
         # Write the score vectors
-        result_file.write("\n")
-        result_file.write("score_vector_ges=")
-        result_file.write(str(score_vector_ges)+ "\n")
-        result_file.write("\n")
-        result_file.write("score_vector_pc=")
-        result_file.write(str(score_vector_pc)+ "\n")
-        result_file.write("\n")
-        result_file.write("score_vector_mmhc=")
-        result_file.write(str(score_vector_mmhc)+ "\n")
-        result_file.write("\n")
-        result_file.write("score_vector_gcim=")
-        result_file.write(str(score_vector_gcim)+ "\n")
-        result_file.write("\n")
-        result_file.write("score_vector_gcim_b=")
-        result_file.write(str(score_vector_gcim_b)+ "\n")
-        result_file.write("\n")
-        result_file.write("score_vector_ges_gcim=")
-        result_file.write(str(score_vector_ges_gcim)+ "\n")
-        result_file.write("\n")
-        result_file.write("score_vector_gcim_phased_b=")
-        result_file.write(str(score_vector_gcim_phased_b)+ "\n")
-        result_file.write("\n")
-        result_file.write("score_vector_ske=")
-        result_file.write(str(score_vector_ske)+ "\n")
-        result_file.write("\n")
-        result_file.write("score_vector_opt=")
-        result_file.write(str(score_vector_opt)+ "\n")
-        result_file.write("\n")
-        result_file.write("score_vector_true=")
-        result_file.write(str(score_vector_true)+ "\n")
-        result_file.write("\n")
+        for algo in alg_vector:
+            result_file.write("\nscore_vector_" + algo + "=" + str(eval("score_vector_" + algo)) + "\n")
+
         # Write the step vectors.
-        result_file.write("step_vector_gcim=")
-        result_file.write(str(step_vector_gcim) + "\n")
-        result_file.write("\n")
-        result_file.write("step_vector_ske=")
-        result_file.write(str(step_vector_ske) + "\n")
-        result_file.write("\n")
-        result_file.write("step_vector_ges_gcim=")
-        result_file.write(str(step_vector_ges_gcim) + "\n")
-        result_file.write("\n")
-        result_file.write("step_vector_gcim_b=")
-        result_file.write(str(step_vector_gcim_b) + "\n")
-        result_file.write("\n")
-        result_file.write("step_vector_gcim_phased_b=")
-        result_file.write(str(step_vector_gcim_phased_b) + "\n")
-        result_file.write("\n")
-        result_file.write("return_dags_vector=")
-        result_file.write(str(return_dags_vector)+ "\n")
-        result_file.write("\n")
+        for algo in step_count_alg:
+            result_file.write("step_vector_" + algo + "=" + str(eval("step_vector_" + algo)) + "\n\n")
+        # Close the result file
         result_file.close()
 print("Run completed.")
 print("Local clock:", time.asctime(time.localtime(time.time())))
-#pygame.mixer.music.play()
+pygame.mixer.music.play()
 
 
 
-for nodes in no_nodes:
-    plot_vector = dataset_type_run
-    
-    shd_matrix_ges_opt = []
-    shd_matrix_ges_true = []
-    shd_matrix_pc_opt = []
-    shd_matrix_pc_true = []
-    shd_matrix_mmhc_opt = []
-    shd_matrix_mmhc_true = []
-    shd_matrix_gcim_opt = []
-    shd_matrix_gcim_true = []
-    shd_matrix_ges_gcim_opt = []
-    shd_matrix_ges_gcim_true = []
-    shd_matrix_ske_opt = []
-    shd_matrix_ske_true = []
-    
-    shd_matrix_opt_true = []
-    
-    step_matrix_gcim = []
-    step_matrix_ske = []
-    step_matrix_ges_gcim = []
-    step_matrix_gcim_b = []
-    step_matrix_gcim_phased_b = []
-    
-    # Get the data as a big matrix and fetch the plotting data
-    for run in dataset_type_run:
-        data_matrix = numpy.genfromtxt(dataset_path + "nodes-"+ str(nodes)+"/"+dataset_type+"-" +str(run)+ "/results.txt", dtype=None, delimiter = '=', encoding=None)
-
-        for i in range(len(data_matrix)):
-            if data_matrix[i][0] == "shd dist ges to true":
-                shd_matrix_ges_true.append(eval(data_matrix[i][1]))
-            elif data_matrix[i][0] == "shd dist ges to opt":
-                shd_matrix_ges_opt.append(eval(data_matrix[i][1]))
-            elif data_matrix[i][0] == "shd dist pc to true":
-                shd_matrix_pc_true.append(eval(data_matrix[i][1]))
-            elif data_matrix[i][0] == "shd dist pc to opt":
-                shd_matrix_pc_opt.append(eval(data_matrix[i][1]))
-            elif data_matrix[i][0] == "shd dist mmhc to true":
-                shd_matrix_mmhc_true.append(eval(data_matrix[i][1]))
-            elif data_matrix[i][0] == "shd dist mmhc to opt":
-                shd_matrix_mmhc_opt.append(eval(data_matrix[i][1]))
-            elif data_matrix[i][0] == "shd dist gcim to true":
-                shd_matrix_gcim_true.append(eval(data_matrix[i][1]))
-            elif data_matrix[i][0] == "shd dist gcim to opt":
-                shd_matrix_gcim_opt.append(eval(data_matrix[i][1]))
-            elif data_matrix[i][0] == "shd dist ges_gcim to true":
-                shd_matrix_ges_gcim_true.append(eval(data_matrix[i][1]))
-            elif data_matrix[i][0] == "shd dist ges_gcim to opt":
-                shd_matrix_ges_gcim_opt.append(eval(data_matrix[i][1]))
-            elif data_matrix[i][0] == "shd dist ske to true":
-                shd_matrix_ske_true.append(eval(data_matrix[i][1]))
-            elif data_matrix[i][0] == "shd dist ske to opt":
-                shd_matrix_ske_opt.append(eval(data_matrix[i][1]))
-            elif data_matrix[i][0] == "shd dist opt to true":
-                shd_matrix_opt_true.append(eval(data_matrix[i][1]))
-            elif data_matrix[i][0] == "step_vector_gcim":
-                step_matrix_gcim.append(eval(data_matrix[i][1]))
-            elif data_matrix[i][0] == "step_vector_ske":
-                step_matrix_ske.append(eval(data_matrix[i][1]))
-            elif data_matrix[i][0] == "step_vector_ges_gcim":
-                step_matrix_ges_gcim.append(eval(data_matrix[i][1]))
-            elif data_matrix[i][0] == "step_vector_gcim_b":
-                step_matrix_gcim_b.append(eval(data_matrix[i][1]))
-            elif data_matrix[i][0] == "step_vector_gcim_phased_b":
-                step_matrix_gcim_phased_b.append(eval(data_matrix[i][1]))
-            
-    
-
-    
-    matplotlib.pyplot.title("Average shd: "+str(nodes))
-    if alg_vector.count('ges') > 0 and alg_vector.count('opt') > 0:
-        matplotlib.pyplot.plot(plot_vector, [sum(shd_matrix_ges_opt[i])/len(shd_matrix_ges_opt[i]) for i in range(len(shd_matrix_ges_opt))], label = 'ges_opt', color='blue', marker="d", linestyle='dashed')
-    if alg_vector.count('ges') > 0 and alg_vector.count('true') > 0:
-        matplotlib.pyplot.plot(plot_vector, [sum(shd_matrix_ges_true[i])/len(shd_matrix_ges_true[i]) for i in range(len(shd_matrix_ges_true))], label = 'ges_true', color='blue', marker="d")
-    if alg_vector.count('mmhc') > 0 and alg_vector.count('opt') > 0:
-        matplotlib.pyplot.plot(plot_vector, [sum(shd_matrix_mmhc_opt[i])/len(shd_matrix_mmhc_opt[i]) for i in range(len(shd_matrix_mmhc_opt))], label = 'mmhc_opt', color='cyan', marker="s", linestyle='dashed')
-    if alg_vector.count('mmhc') > 0 and alg_vector.count('true') > 0:
-        matplotlib.pyplot.plot(plot_vector, [sum(shd_matrix_mmhc_true[i])/len(shd_matrix_mmhc_true[i]) for i in range(len(shd_matrix_mmhc_true))], label = 'mmhc_true', color='cyan', marker="s")
-    if alg_vector.count('gcim') > 0 and alg_vector.count('opt') > 0:
-        matplotlib.pyplot.plot(plot_vector, [sum(shd_matrix_gcim_opt[i])/len(shd_matrix_gcim_opt[i]) for i in range(len(shd_matrix_gcim_opt))], label = 'gcim_opt', color='magenta', marker="^", linestyle='dashed')
-    if alg_vector.count('gcim') > 0 and alg_vector.count('true') > 0:
-        matplotlib.pyplot.plot(plot_vector, [sum(shd_matrix_gcim_true[i])/len(shd_matrix_gcim_true[i]) for i in range(len(shd_matrix_gcim_true))], label = 'gcim_true', color='magenta', marker="^")
-    if alg_vector.count('ske') > 0 and alg_vector.count('opt') > 0:
-        matplotlib.pyplot.plot(plot_vector, [sum(shd_matrix_ske_opt[i])/len(shd_matrix_ske_opt[i]) for i in range(len(shd_matrix_ske_opt))], label = 'ske_opt', color='red', marker="v", linestyle='dashed')
-    if alg_vector.count('ske') > 0 and alg_vector.count('true') > 0:
-        matplotlib.pyplot.plot(plot_vector, [sum(shd_matrix_ske_true[i])/len(shd_matrix_ske_true[i]) for i in range(len(shd_matrix_ske_true))], label = 'ske_true', color='red', marker="v")
-    if alg_vector.count('opt') > 0 and alg_vector.count('true') > 0:
-        matplotlib.pyplot.plot(plot_vector, [sum(shd_matrix_opt_true[i])/len(shd_matrix_opt_true[i]) for i in range(len(shd_matrix_opt_true))], label = 'opt_true', color='green', marker="x")
-    matplotlib.pyplot.legend(loc = 'upper left')
-    matplotlib.pyplot.xlim(0.5,7)
-    
-    matplotlib.pyplot.savefig(dataset_path + "avg_shd_nodes-"+str(nodes)+"_sample-"+str(samples_no)+"_alpha-"+str(alpha)+".pdf")
-    matplotlib.pyplot.show()
 
 
-    
-    # Plot proportion of time found true graph
-    matplotlib.pyplot.title("Proportion of models they agree on: "+str(nodes)) # Give better name
-    if alg_vector.count('gcim') > 0 and alg_vector.count('opt') > 0:
-        matplotlib.pyplot.plot(plot_vector, [shd_matrix_gcim_opt[i].count(0)/len(shd_matrix_gcim_opt[i]) for i in range(len(shd_matrix_gcim_opt))], label = 'gcim_opt', color='magenta', marker="^", linestyle='dashed')
-    if alg_vector.count('gcim') > 0 and alg_vector.count('true') > 0:
-        matplotlib.pyplot.plot(plot_vector, [shd_matrix_gcim_true[i].count(0)/len(shd_matrix_gcim_true[i]) for i in range(len(shd_matrix_gcim_true))], label = 'gcim_true', color='magenta', marker="^")
-    if alg_vector.count('ges_gcim') > 0 and alg_vector.count('opt') > 0:
-        matplotlib.pyplot.plot(plot_vector, [shd_matrix_ges_gcim_opt[i].count(0)/len(shd_matrix_ges_gcim_opt[i]) for i in range(len(shd_matrix_ges_gcim_opt))], label = 'ges_gcim_opt', color='turquoise', marker="x", linestyle='dashed')
-    if alg_vector.count('ges_gcim') > 0 and alg_vector.count('true') > 0:
-        matplotlib.pyplot.plot(plot_vector, [shd_matrix_ges_gcim_true[i].count(0)/len(shd_matrix_ges_gcim_true[i]) for i in range(len(shd_matrix_ges_gcim_true))], label = 'ges_gcim_true', color='turquoise', marker="x")
-    if alg_vector.count('gcim_phased_b') > 0 and alg_vector.count('opt') > 0:
-        matplotlib.pyplot.plot(plot_vector, [shd_matrix_gcim_phased_b_opt[i].count(0)/len(shd_matrix_gcim_phased_b_opt[i]) for i in range(len(shd_matrix_gcim_phased_b_opt))], label = 'gcim_phased_b_opt', color='yellow', marker="X", linestyle='dashed')
-    if alg_vector.count('gcim_phased_b') > 0 and alg_vector.count('true') > 0:
-        matplotlib.pyplot.plot(plot_vector, [shd_matrix_gcim_phased_b_true[i].count(0)/len(shd_matrix_gcim_phased_b_true[i]) for i in range(len(shd_matrix_gcim_phased_b_true))], label = 'gcim_phased_b_true', color='yellow', marker="X")
-    if alg_vector.count('pc') > 0 and alg_vector.count('opt') > 0:
-        matplotlib.pyplot.plot(plot_vector, [shd_matrix_pc_opt[i].count(0)/len(shd_matrix_pc_opt[i]) for i in range(len(shd_matrix_pc_opt))], label = 'pc_opt', color='orange', marker="o", linestyle='dashed')
-    if alg_vector.count('pc') > 0 and alg_vector.count('true') > 0:
-        matplotlib.pyplot.plot(plot_vector, [shd_matrix_pc_true[i].count(0)/len(shd_matrix_pc_true[i]) for i in range(len(shd_matrix_pc_true))], label = 'pc_true', color='orange', marker="o",)
-    if alg_vector.count('mmhc') > 0 and alg_vector.count('opt') > 0:
-        matplotlib.pyplot.plot(plot_vector, [shd_matrix_mmhc_opt[i].count(0)/len(shd_matrix_mmhc_opt[i]) for i in range(len(shd_matrix_mmhc_opt))], label = 'mmhc_opt', color='cyan', marker="s", linestyle='dashed')
-    if alg_vector.count('mmhc') > 0 and alg_vector.count('true') > 0:
-        matplotlib.pyplot.plot(plot_vector, [shd_matrix_mmhc_true[i].count(0)/len(shd_matrix_mmhc_true[i]) for i in range(len(shd_matrix_mmhc_true))], label = 'mmhc_true', color='cyan', marker="s")
-    if alg_vector.count('ges') > 0 and alg_vector.count('opt') > 0:
-        matplotlib.pyplot.plot(plot_vector, [shd_matrix_ges_opt[i].count(0)/len(shd_matrix_ges_opt[i]) for i in range(len(shd_matrix_ges_opt))], label = 'ges_opt', color='blue', marker="d", linestyle='dashed')
-    if alg_vector.count('ges') > 0 and alg_vector.count('true') > 0:
-        matplotlib.pyplot.plot(plot_vector, [shd_matrix_ges_true[i].count(0)/len(shd_matrix_ges_true[i]) for i in range(len(shd_matrix_ges_true))], label = 'ges_true', color='blue', marker="d")
-    if alg_vector.count('ske') > 0 and alg_vector.count('opt') > 0:
-        matplotlib.pyplot.plot(plot_vector, [shd_matrix_ske_opt[i].count(0)/len(shd_matrix_ske_opt[i]) for i in range(len(shd_matrix_ske_opt))], label = 'ske_opt', color='red', marker="v", linestyle='dashed')
-    if alg_vector.count('ske') > 0 and alg_vector.count('true') > 0:
-        matplotlib.pyplot.plot(plot_vector, [shd_matrix_ske_true[i].count(0)/len(shd_matrix_ske_true[i]) for i in range(len(shd_matrix_ske_true))], label = 'ske_true', color='red', marker="v")
-    if alg_vector.count('opt') > 0 and alg_vector.count('true') > 0:
-        matplotlib.pyplot.plot(plot_vector, [shd_matrix_opt_true[i].count(0)/len(shd_matrix_opt_true[i]) for i in range(len(shd_matrix_opt_true))], label = 'opt_true', color='green', marker="x")
-    matplotlib.pyplot.legend(loc = 'upper right')
-    matplotlib.pyplot.ylim(0,1)
-    matplotlib.pyplot.xlim(0.5,7)
 
 
-    matplotlib.pyplot.savefig(dataset_path + "prop_of_agree_nodes-"+str(nodes)+"_sample-"+str(samples_no)+"_alpha-"+str(alpha)+".pdf")
-    matplotlib.pyplot.show()
-    
-    # Plot average number of steps taken
-    matplotlib.pyplot.title("Average number of steps taken: "+str(nodes)) 
-    if alg_vector.count('gcim') > 0:
-        matplotlib.pyplot.plot(plot_vector, [sum(step_matrix_gcim[i])/len(step_matrix_gcim[i]) for i in range(len(step_matrix_gcim))], label = 'gcim_steps', color='magenta', marker="^")
-    if alg_vector.count('ges_gcim') > 0:
-        matplotlib.pyplot.plot(plot_vector, [sum(step_matrix_ges_gcim[i])/len(step_matrix_ges_gcim[i]) for i in range(len(step_matrix_ges_gcim))], label = 'ges_gcim_steps', color='turquoise', marker="x")
-    if alg_vector.count('ske') > 0:
-        matplotlib.pyplot.plot(plot_vector, [sum(step_matrix_ske[i])/len(step_matrix_ske[i]) for i in range(len(step_matrix_ske))], label = 'ske_steps', color='red',  marker="v")
-    if alg_vector.count('gcim_b') > 0:
-        matplotlib.pyplot.plot(plot_vector, [sum(step_matrix_gcim_b[i])/len(step_matrix_gcim_b[i]) for i in range(len(step_matrix_gcim_b))], label = 'gcim_b_steps', color='orange')
-    if alg_vector.count('gcim_phased_b') > 0:
-        matplotlib.pyplot.plot(plot_vector, [sum(step_matrix_gcim_phased_b[i])/len(step_matrix_gcim_phased_b[i]) for i in range(len(step_matrix_gcim_phased_b))], label = 'gcim_phased_b_steps', color='yellow', marker='X')
-    matplotlib.pyplot.legend(loc = 'right')
-    matplotlib.pyplot.xlim(0.5,7)
 
-    
-    matplotlib.pyplot.savefig(dataset_path + "avg_no_steps_nodes-"+str(nodes)+".pdf")
-    matplotlib.pyplot.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Old code for running the algorithms and collecting results on simulated data
+
+# # Initiate some variables
+# # A sorted version of the alg_vector_choose to make coding easier
+# alg_vector = ["ges", "pc", "mmhc", "gcim", "ges_gcim", "ske", "gcim_b", "gcim_phased_b", "opt", "true"]
+# alg_vector_copy = alg_vector.copy()
+# for i in alg_vector_copy:
+#     if alg_vector_choose.count(i) == 0:
+#         alg_vector.remove(i)
+# # Which algorithms to count the number of steps on
+# step_count_alg = alg_vector.copy()
+# for i in ["ges", "pc", "mmhc", "opt", "true"]:
+#     try:
+#         step_count_alg.remove(i)
+#     except ValueError:
+#         pass
+#
+#
+# # Print starting message
+# print("Local clock:", time.asctime(time.localtime(time.time())))
+# print("Testing with:")
+# print("Algorithms:", alg_vector)
+# print("From:", dataset_path+"nodes-"+str(no_nodes)+"/"+dataset_type+"-"+str(dataset_type_run))
+#
+#
+# for nodes in no_nodes:
+#     print("Starting testing with nodes: ", nodes)
+# #     dataset_type_run = [i for i in range(1, nodes)]
+#     for run in dataset_type_run:
+#         print("Starting testing with " + dataset_type +": " + str(run))
+#
+#         # Score vectors to save the BIC score
+#         return_dags_vector = [alg_vector]
+#         score_vector_ges = []
+#         score_vector_pc = []
+#         score_vector_mmhc = []
+#         score_vector_gcim = []
+#         score_vector_ges_gcim = []
+#         score_vector_gcim_b = []
+#         score_vector_gcim_phased_b = []
+#         score_vector_true = []
+#         score_vector_ske = []
+#         score_vector_opt = []
+#
+#         # Step vectors to get some extra data
+#         step_vector_gcim = []
+#         step_vector_ske = []
+#         step_vector_gcim_b = []
+#         step_vector_gcim_phased_b = []
+#         step_vector_ges_gcim = []
+#
+#         # Shd vectors to save the shds
+#         shd_vector_ges_opt = []
+#         shd_vector_ges_true = []
+#         shd_vector_pc_opt = []
+#         shd_vector_pc_true = []
+#         shd_vector_mmhc_opt = []
+#         shd_vector_mmhc_true = []
+#         shd_vector_gcim_opt = []
+#         shd_vector_gcim_true = []
+#         shd_vector_ges_gcim_opt = []
+#         shd_vector_ges_gcim_true = []
+#         shd_vector_ske_opt = []
+#         shd_vector_ske_true = []
+#
+#         shd_vector_opt_true = []
+#
+#         print("[", end = "")
+#         progress_res = min(50, len(models_name))
+#         progress_vector = [numpy.floor(i*len(models_name)/progress_res) for i in range(1, progress_res)]
+#         for no in range(len(models_name)):
+#             if no in progress_vector:
+#                 print("=", end = "")
+#             BIC = initiate_BIC(dataset_path + "nodes-"+ str(nodes)+"/"+dataset_type+"-" +str(run)+ "/"+models_name[no])
+#             step_count_vector_temp = []
+#             # Do the 'ges'
+#             if alg_vector.count('ges') > 0:
+#                 return_ges_dag = gaussParDAG2igraph(pcalg.ges(BIC)[1])
+#                 score_vector_ges.append(score_BIC(BIC, return_ges_dag))
+#             # Do the 'pc'
+#             pc_success = False
+#             if alg_vector.count('pc') > 0:
+#                 try:
+#                     return_pc_dag = pc(BIC, input_cut_off= alpha)
+#                     pc_success = True
+#                     score_vector_pc.append(score_BIC(BIC, return_pc_dag))
+#                 except ValueError:
+#                     pass
+#             # Do the 'mmhc'
+#             if alg_vector.count('mmhc') > 0:
+#                 return_mmhc_dag = mmhc(BIC)
+#                 score_vector_mmhc.append(score_BIC(BIC, return_mmhc_dag))
+#             # Do the gcim
+#             if alg_vector.count('gcim') > 0:
+#                 return_gcim = gcim(BIC)
+#                 return_gcim_dag = imset2dag(return_gcim[0])
+#                 score_vector_gcim.append(return_gcim[1])
+#                 step_vector_gcim.append(return_gcim[2])
+#             # Do the skeletal 'gcim'
+#             if alg_vector.count('ske') > 0:
+#                 skeleton_graph = skeleton(BIC, input_cut_off= alpha)
+#                 try:
+#                     dir_graph = skeleton_graph.copy()
+#                     dir_graph.to_directed(mutual = True)
+#                     dir_graph = pdag2dag(dir_graph)
+#                 except ValueError:
+#                     dir_graph = skeleton_graph.copy()
+#                     dir_graph.to_directed(mutual = False)
+#                 return_ske = gcim(BIC, input_graph = dir_graph, edge_phase= False)
+#                 return_ske_dag = imset2dag(return_ske[0])
+#                 score_vector_ske.append(return_ske[1])
+#                 step_vector_ske.append(return_ske[2])
+#             # Do the 'gcim_b')
+#             if alg_vector.count('gcim_b') > 0:
+#                 return_gcim_b = gcim_b(BIC)
+#                 return_gcim_b_dag = imset2dag(return_gcim_b[0])
+#                 score_vector_gcim_b.append(return_gcim_b[1])
+#                 step_vector_gcim_b.append(return_gcim_b[2])
+#             # Do the 'gcim_phased_b'
+#             if alg_vector.count('gcim_phased_b') > 0:
+#                 return_gcim_phased_b = gcim_phased_b(BIC)
+#                 return_gcim_phased_b_dag = imset2dag(return_gcim_phased_b[0])
+#                 score_vector_gcim_phased_b.append(return_gcim_phased_b[1])
+#                 step_vector_gcim_phased_b.append(return_gcim_phased_b[2])
+#             # Do the 'ges_gcim'
+#             if alg_vector.count('ges_gcim') > 0:
+#                 if alg_vector.count('ges') > 0:
+#                     initial_imset_ges_gcim = imset(return_ges_dag)
+#                 else:
+#                     initial_imset_ges_gcim = imset(gaussParDAG2igraph(pcalg.ges(BIC)[1]))
+#                 return_ges_gcim = gcim(BIC, input_imset=initial_imset_ges_gcim)
+#                 return_ges_gcim_dag = imset2dag(return_ges_gcim[0])
+#                 score_vector_ges_gcim.append(return_ges_gcim[1])
+#                 step_vector_ges_gcim.append(return_ges_gcim[2])
+#             # Do the 'naive_search' (opt)
+#             if alg_vector.count('opt') > 0:
+#                 return_opt = naive_search(imsetlist, BIC)
+#                 return_opt_dag = imset2dag(return_opt[0])
+#                 score_vector_opt.append(return_opt[1])
+#             # Do the 'true'
+#             if alg_vector.count('true') > 0:
+#                 return_true_dag = read_dag(dataset_path + "nodes-"+ str(nodes)+"/"+dataset_type+"-" +str(run)+ "/"+graph_name[no])
+#                 return_true_score = score_BIC(BIC, return_true_dag)
+#                 score_vector_true.append(return_true_score)
+#
+#             # Calculate the shd_vectors
+#             if alg_vector.count('ges') > 0 and alg_vector.count('opt') > 0:
+#                 shd_vector_ges_opt.append(shd(return_ges_dag, return_opt_dag))
+#             if alg_vector.count('ges') > 0 and alg_vector.count('true') > 0:
+#                 shd_vector_ges_true.append(shd(return_ges_dag, return_true_dag))
+#             if alg_vector.count('pc') > 0 and alg_vector.count('opt') > 0:
+#                 if pc_success:
+#                     shd_vector_pc_opt.append(shd(return_pc_dag, return_opt_dag))
+#                 else:
+#                     shd_vector_pc_opt.append(-1)
+#             if alg_vector.count('pc') > 0 and alg_vector.count('true') > 0:
+#                 shd_vector_pc_true.append(shd(return_pc_dag, return_true_dag))
+#             if alg_vector.count('mmhc') > 0 and alg_vector.count('opt') > 0:
+#                 shd_vector_mmhc_opt.append(shd(return_mmhc_dag, return_opt_dag))
+#             if alg_vector.count('mmhc') > 0 and alg_vector.count('true') > 0:
+#                 shd_vector_mmhc_true.append(shd(return_mmhc_dag, return_true_dag))
+#             if alg_vector.count('gcim') > 0 and alg_vector.count('opt') > 0:
+#                 shd_vector_gcim_opt.append(shd(return_gcim_dag, return_opt_dag))
+#             if alg_vector.count('gcim') > 0 and alg_vector.count('true') > 0:
+#                 shd_vector_gcim_true.append(shd(return_gcim_dag, return_true_dag))
+#             if alg_vector.count('ske') > 0 and alg_vector.count('opt') > 0:
+#                 shd_vector_ske_opt.append(shd(return_ske_dag, return_opt_dag))
+#             if alg_vector.count('ske') > 0 and alg_vector.count('true') > 0:
+#                 shd_vector_ske_true.append(shd(return_ske_dag, return_true_dag))
+#             if alg_vector.count('ges_gcim') > 0 and alg_vector.count('opt') > 0:
+#                 shd_vector_ges_gcim_opt.append(shd(return_ges_gcim_dag, return_opt_dag))
+#             if alg_vector.count('ges_gcim') > 0 and alg_vector.count('true') > 0:
+#                 shd_vector_ges_gcim_true.append(shd(return_ges_gcim_dag, return_true_dag))
+#             if alg_vector.count('opt') > 0 and alg_vector.count('true') > 0:
+#                 shd_vector_opt_true.append(shd(return_opt_dag, return_true_dag))
+#
+#             # Save the dags as edgelists for future reference
+#             return_dags_vector_temp = []
+#             if alg_vector.count('ges') > 0:
+#                 return_dags_vector_temp.append(return_ges_dag.get_edgelist())
+#             if alg_vector.count('pc') > 0:
+#                 if pc_success:
+#                     return_dags_vector_temp.append(return_pc_dag.get_edgelist())
+#                 else:
+#                     return_dags_vector_temp.append(None)
+#             if alg_vector.count('mmhc') > 0:
+#                 return_dags_vector_temp.append(return_mmhc_dag.get_edgelist())
+#             if alg_vector.count('gcim') > 0:
+#                 return_dags_vector_temp.append(return_gcim_dag.get_edgelist())
+#             if alg_vector.count('ges_gcim') > 0:
+#                 return_dags_vector_temp.append(return_ges_gcim_dag.get_edgelist())
+#             if alg_vector.count('ske') > 0:
+#                 return_dags_vector_temp.append(return_ske_dag.get_edgelist())
+#             if alg_vector.count('gcim_b') > 0:
+#                 return_dags_vector_temp.append(return_gcim_b_dag.get_edgelist())
+#             if alg_vector.count('gcim_phased_b') > 0:
+#                 return_dags_vector_temp.append(return_gcim_phased_b_dag.get_edgelist())
+#             if alg_vector.count('opt') > 0:
+#                 return_dags_vector_temp.append(return_opt_dag.get_edgelist())
+#             if alg_vector.count('true') > 0:
+#                 return_dags_vector_temp.append(return_true_dag.get_edgelist())
+#
+#             return_dags_vector.append(return_dags_vector_temp)
+#         print("]")
+#         # Write the results to a results.txt file.
+#         result_file = open(dataset_path + "nodes-"+ str(nodes)+"/"+dataset_type+"-" +str(run)+ "/results.txt", "w")
+#         # Write what data we used
+#         result_file.write("Number of nodes="+str(nodes)+"\n")
+#         result_file.write("Number of samples="+str(samples_no)+"\n")
+#         result_file.write("Cut of limit used="+str(alpha)+"\n")
+#         # Write the total BIC score
+#         if alg_vector.count('ges') > 0:
+#             result_file.write("total_score_ges="+ str(sum(score_vector_ges))+ "\n")
+#         if alg_vector.count('pc') > 0:
+#             result_file.write("total_score_pc="+ str(sum(score_vector_pc))+ "\n")
+#         if alg_vector.count('mmhc') > 0:
+#             result_file.write("total_score_mmhc="+ str(sum(score_vector_mmhc))+ "\n")
+#         if alg_vector.count('gcim') > 0:
+#             result_file.write("total_score_gcim="+ str(sum(score_vector_gcim))+ "\n")
+#         if alg_vector.count('ges_gcim') > 0:
+#             result_file.write("total_score_ges_gcim="+ str(sum(score_vector_ges_gcim))+ "\n")
+#         if alg_vector.count('ske') > 0:
+#             result_file.write("total_score_ske="+ str(sum(score_vector_ske))+ "\n")
+#         if alg_vector.count('gcim_b') > 0:
+#             result_file.write("total_score_gcim_b="+str(sum(score_vector_gcim_b)))
+#         if alg_vector.count('gcim_phased_b') > 0:
+#             result_file.write("total_score_gcim_phased_b="+ str(sum(score_vector_gcim_phased_b))+ "\n")
+#         if alg_vector.count('opt') > 0:
+#             result_file.write("total_score_opt="+ str(sum(score_vector_opt))+ "\n")
+#         if alg_vector.count('true') > 0:
+#             result_file.write("total_score_true="+ str(sum(score_vector_true))+ "\n")
+#
+#         # Write the shd to file
+#         if len(shd_vector_ges_opt) > 0:
+#             result_file.write("shd dist ges to opt="+ str(shd_vector_ges_opt)+ "\n")
+#         if len(shd_vector_ges_true) > 0:
+#             result_file.write("shd dist ges to true="+ str(shd_vector_ges_true)+ "\n")
+#         if len(shd_vector_pc_opt) > 0:
+#             result_file.write("shd dist pc to opt="+ str(shd_vector_pc_opt)+ "\n")
+#         if len(shd_vector_pc_true) > 0:
+#             result_file.write("shd dist pc to true="+ str(shd_vector_pc_true)+ "\n")
+#         if len(shd_vector_mmhc_opt) > 0:
+#             result_file.write("shd dist mmhc to opt="+ str(shd_vector_mmhc_opt)+ "\n")
+#         if len(shd_vector_mmhc_true) > 0:
+#             result_file.write("shd dist mmhc to true="+ str(shd_vector_mmhc_true)+ "\n")
+#         if len(shd_vector_gcim_opt) > 0:
+#             result_file.write("shd dist gcim to opt="+ str(shd_vector_gcim_opt)+ "\n")
+#         if len(shd_vector_gcim_true) > 0:
+#             result_file.write("shd dist gcim to true="+ str(shd_vector_gcim_true)+ "\n")
+#         if len(shd_vector_ges_gcim_opt) > 0:
+#             result_file.write("shd dist ges_gcim to opt="+ str(shd_vector_ges_gcim_opt)+ "\n")
+#         if len(shd_vector_ges_gcim_true) > 0:
+#             result_file.write("shd dist ges_gcim to true="+ str(shd_vector_ges_gcim_true)+ "\n")
+#         if len(shd_vector_ske_opt) > 0:
+#             result_file.write("shd dist ske to opt="+ str(shd_vector_ske_opt)+ "\n")
+#         if len(shd_vector_ske_true) > 0:
+#             result_file.write("shd dist ske to true="+ str(shd_vector_ske_true)+ "\n")
+#         if len(shd_vector_opt_true) > 0:
+#             result_file.write("shd dist opt to true="+ str(shd_vector_opt_true)+ "\n")
+#         # Write the score vectors
+#         result_file.write("\n")
+#         result_file.write("score_vector_ges=")
+#         result_file.write(str(score_vector_ges)+ "\n")
+#         result_file.write("\n")
+#         result_file.write("score_vector_pc=")
+#         result_file.write(str(score_vector_pc)+ "\n")
+#         result_file.write("\n")
+#         result_file.write("score_vector_mmhc=")
+#         result_file.write(str(score_vector_mmhc)+ "\n")
+#         result_file.write("\n")
+#         result_file.write("score_vector_gcim=")
+#         result_file.write(str(score_vector_gcim)+ "\n")
+#         result_file.write("\n")
+#         result_file.write("score_vector_gcim_b=")
+#         result_file.write(str(score_vector_gcim_b)+ "\n")
+#         result_file.write("\n")
+#         result_file.write("score_vector_ges_gcim=")
+#         result_file.write(str(score_vector_ges_gcim)+ "\n")
+#         result_file.write("\n")
+#         result_file.write("score_vector_gcim_phased_b=")
+#         result_file.write(str(score_vector_gcim_phased_b)+ "\n")
+#         result_file.write("\n")
+#         result_file.write("score_vector_ske=")
+#         result_file.write(str(score_vector_ske)+ "\n")
+#         result_file.write("\n")
+#         result_file.write("score_vector_opt=")
+#         result_file.write(str(score_vector_opt)+ "\n")
+#         result_file.write("\n")
+#         result_file.write("score_vector_true=")
+#         result_file.write(str(score_vector_true)+ "\n")
+#         result_file.write("\n")
+#         # Write the step vectors.
+#         result_file.write("step_vector_gcim=")
+#         result_file.write(str(step_vector_gcim) + "\n")
+#         result_file.write("\n")
+#         result_file.write("step_vector_ske=")
+#         result_file.write(str(step_vector_ske) + "\n")
+#         result_file.write("\n")
+#         result_file.write("step_vector_ges_gcim=")
+#         result_file.write(str(step_vector_ges_gcim) + "\n")
+#         result_file.write("\n")
+#         result_file.write("step_vector_gcim_b=")
+#         result_file.write(str(step_vector_gcim_b) + "\n")
+#         result_file.write("\n")
+#         result_file.write("step_vector_gcim_phased_b=")
+#         result_file.write(str(step_vector_gcim_phased_b) + "\n")
+#         result_file.write("\n")
+#         result_file.write("return_dags_vector=")
+#         result_file.write(str(return_dags_vector)+ "\n")
+#         result_file.write("\n")
+#         result_file.close()
+# print("Run completed.")
+# print("Local clock:", time.asctime(time.localtime(time.time())))
+# #pygame.mixer.music.play()
+#
+#
+#
+# for nodes in no_nodes:
+#     plot_vector = dataset_type_run
+#
+#     shd_matrix_ges_opt = []
+#     shd_matrix_ges_true = []
+#     shd_matrix_pc_opt = []
+#     shd_matrix_pc_true = []
+#     shd_matrix_mmhc_opt = []
+#     shd_matrix_mmhc_true = []
+#     shd_matrix_gcim_opt = []
+#     shd_matrix_gcim_true = []
+#     shd_matrix_ges_gcim_opt = []
+#     shd_matrix_ges_gcim_true = []
+#     shd_matrix_ske_opt = []
+#     shd_matrix_ske_true = []
+#
+#     shd_matrix_opt_true = []
+#
+#     step_matrix_gcim = []
+#     step_matrix_ske = []
+#     step_matrix_ges_gcim = []
+#     step_matrix_gcim_b = []
+#     step_matrix_gcim_phased_b = []
+#
+#     # Get the data as a big matrix and fetch the plotting data
+#     for run in dataset_type_run:
+#         data_matrix = numpy.genfromtxt(dataset_path + "nodes-"+ str(nodes)+"/"+dataset_type+"-" +str(run)+ "/results.txt", dtype=None, delimiter = '=', encoding=None)
+#
+#         for i in range(len(data_matrix)):
+#             if data_matrix[i][0] == "shd dist ges to true":
+#                 shd_matrix_ges_true.append(eval(data_matrix[i][1]))
+#             elif data_matrix[i][0] == "shd dist ges to opt":
+#                 shd_matrix_ges_opt.append(eval(data_matrix[i][1]))
+#             elif data_matrix[i][0] == "shd dist pc to true":
+#                 shd_matrix_pc_true.append(eval(data_matrix[i][1]))
+#             elif data_matrix[i][0] == "shd dist pc to opt":
+#                 shd_matrix_pc_opt.append(eval(data_matrix[i][1]))
+#             elif data_matrix[i][0] == "shd dist mmhc to true":
+#                 shd_matrix_mmhc_true.append(eval(data_matrix[i][1]))
+#             elif data_matrix[i][0] == "shd dist mmhc to opt":
+#                 shd_matrix_mmhc_opt.append(eval(data_matrix[i][1]))
+#             elif data_matrix[i][0] == "shd dist gcim to true":
+#                 shd_matrix_gcim_true.append(eval(data_matrix[i][1]))
+#             elif data_matrix[i][0] == "shd dist gcim to opt":
+#                 shd_matrix_gcim_opt.append(eval(data_matrix[i][1]))
+#             elif data_matrix[i][0] == "shd dist ges_gcim to true":
+#                 shd_matrix_ges_gcim_true.append(eval(data_matrix[i][1]))
+#             elif data_matrix[i][0] == "shd dist ges_gcim to opt":
+#                 shd_matrix_ges_gcim_opt.append(eval(data_matrix[i][1]))
+#             elif data_matrix[i][0] == "shd dist ske to true":
+#                 shd_matrix_ske_true.append(eval(data_matrix[i][1]))
+#             elif data_matrix[i][0] == "shd dist ske to opt":
+#                 shd_matrix_ske_opt.append(eval(data_matrix[i][1]))
+#             elif data_matrix[i][0] == "shd dist opt to true":
+#                 shd_matrix_opt_true.append(eval(data_matrix[i][1]))
+#             elif data_matrix[i][0] == "step_vector_gcim":
+#                 step_matrix_gcim.append(eval(data_matrix[i][1]))
+#             elif data_matrix[i][0] == "step_vector_ske":
+#                 step_matrix_ske.append(eval(data_matrix[i][1]))
+#             elif data_matrix[i][0] == "step_vector_ges_gcim":
+#                 step_matrix_ges_gcim.append(eval(data_matrix[i][1]))
+#             elif data_matrix[i][0] == "step_vector_gcim_b":
+#                 step_matrix_gcim_b.append(eval(data_matrix[i][1]))
+#             elif data_matrix[i][0] == "step_vector_gcim_phased_b":
+#                 step_matrix_gcim_phased_b.append(eval(data_matrix[i][1]))
+#
+#
+#
+#
+#     matplotlib.pyplot.title("Average shd: "+str(nodes))
+#     if alg_vector.count('ges') > 0 and alg_vector.count('opt') > 0:
+#         matplotlib.pyplot.plot(plot_vector, [sum(shd_matrix_ges_opt[i])/len(shd_matrix_ges_opt[i]) for i in range(len(shd_matrix_ges_opt))], label = 'ges_opt', color='blue', marker="d", linestyle='dashed')
+#     if alg_vector.count('ges') > 0 and alg_vector.count('true') > 0:
+#         matplotlib.pyplot.plot(plot_vector, [sum(shd_matrix_ges_true[i])/len(shd_matrix_ges_true[i]) for i in range(len(shd_matrix_ges_true))], label = 'ges_true', color='blue', marker="d")
+#     if alg_vector.count('mmhc') > 0 and alg_vector.count('opt') > 0:
+#         matplotlib.pyplot.plot(plot_vector, [sum(shd_matrix_mmhc_opt[i])/len(shd_matrix_mmhc_opt[i]) for i in range(len(shd_matrix_mmhc_opt))], label = 'mmhc_opt', color='cyan', marker="s", linestyle='dashed')
+#     if alg_vector.count('mmhc') > 0 and alg_vector.count('true') > 0:
+#         matplotlib.pyplot.plot(plot_vector, [sum(shd_matrix_mmhc_true[i])/len(shd_matrix_mmhc_true[i]) for i in range(len(shd_matrix_mmhc_true))], label = 'mmhc_true', color='cyan', marker="s")
+#     if alg_vector.count('gcim') > 0 and alg_vector.count('opt') > 0:
+#         matplotlib.pyplot.plot(plot_vector, [sum(shd_matrix_gcim_opt[i])/len(shd_matrix_gcim_opt[i]) for i in range(len(shd_matrix_gcim_opt))], label = 'gcim_opt', color='magenta', marker="^", linestyle='dashed')
+#     if alg_vector.count('gcim') > 0 and alg_vector.count('true') > 0:
+#         matplotlib.pyplot.plot(plot_vector, [sum(shd_matrix_gcim_true[i])/len(shd_matrix_gcim_true[i]) for i in range(len(shd_matrix_gcim_true))], label = 'gcim_true', color='magenta', marker="^")
+#     if alg_vector.count('ske') > 0 and alg_vector.count('opt') > 0:
+#         matplotlib.pyplot.plot(plot_vector, [sum(shd_matrix_ske_opt[i])/len(shd_matrix_ske_opt[i]) for i in range(len(shd_matrix_ske_opt))], label = 'ske_opt', color='red', marker="v", linestyle='dashed')
+#     if alg_vector.count('ske') > 0 and alg_vector.count('true') > 0:
+#         matplotlib.pyplot.plot(plot_vector, [sum(shd_matrix_ske_true[i])/len(shd_matrix_ske_true[i]) for i in range(len(shd_matrix_ske_true))], label = 'ske_true', color='red', marker="v")
+#     if alg_vector.count('opt') > 0 and alg_vector.count('true') > 0:
+#         matplotlib.pyplot.plot(plot_vector, [sum(shd_matrix_opt_true[i])/len(shd_matrix_opt_true[i]) for i in range(len(shd_matrix_opt_true))], label = 'opt_true', color='green', marker="x")
+#     matplotlib.pyplot.legend(loc = 'upper left')
+#     matplotlib.pyplot.xlim(0.5,7)
+#
+#     matplotlib.pyplot.savefig(dataset_path + "avg_shd_nodes-"+str(nodes)+"_sample-"+str(samples_no)+"_alpha-"+str(alpha)+".pdf")
+#     matplotlib.pyplot.show()
+#
+#
+#
+#     # Plot proportion of time found true graph
+#     matplotlib.pyplot.title("Proportion of models they agree on: "+str(nodes)) # Give better name
+#     if alg_vector.count('gcim') > 0 and alg_vector.count('opt') > 0:
+#         matplotlib.pyplot.plot(plot_vector, [shd_matrix_gcim_opt[i].count(0)/len(shd_matrix_gcim_opt[i]) for i in range(len(shd_matrix_gcim_opt))], label = 'gcim_opt', color='magenta', marker="^", linestyle='dashed')
+#     if alg_vector.count('gcim') > 0 and alg_vector.count('true') > 0:
+#         matplotlib.pyplot.plot(plot_vector, [shd_matrix_gcim_true[i].count(0)/len(shd_matrix_gcim_true[i]) for i in range(len(shd_matrix_gcim_true))], label = 'gcim_true', color='magenta', marker="^")
+#     if alg_vector.count('ges_gcim') > 0 and alg_vector.count('opt') > 0:
+#         matplotlib.pyplot.plot(plot_vector, [shd_matrix_ges_gcim_opt[i].count(0)/len(shd_matrix_ges_gcim_opt[i]) for i in range(len(shd_matrix_ges_gcim_opt))], label = 'ges_gcim_opt', color='turquoise', marker="x", linestyle='dashed')
+#     if alg_vector.count('ges_gcim') > 0 and alg_vector.count('true') > 0:
+#         matplotlib.pyplot.plot(plot_vector, [shd_matrix_ges_gcim_true[i].count(0)/len(shd_matrix_ges_gcim_true[i]) for i in range(len(shd_matrix_ges_gcim_true))], label = 'ges_gcim_true', color='turquoise', marker="x")
+#     if alg_vector.count('gcim_phased_b') > 0 and alg_vector.count('opt') > 0:
+#         matplotlib.pyplot.plot(plot_vector, [shd_matrix_gcim_phased_b_opt[i].count(0)/len(shd_matrix_gcim_phased_b_opt[i]) for i in range(len(shd_matrix_gcim_phased_b_opt))], label = 'gcim_phased_b_opt', color='yellow', marker="X", linestyle='dashed')
+#     if alg_vector.count('gcim_phased_b') > 0 and alg_vector.count('true') > 0:
+#         matplotlib.pyplot.plot(plot_vector, [shd_matrix_gcim_phased_b_true[i].count(0)/len(shd_matrix_gcim_phased_b_true[i]) for i in range(len(shd_matrix_gcim_phased_b_true))], label = 'gcim_phased_b_true', color='yellow', marker="X")
+#     if alg_vector.count('pc') > 0 and alg_vector.count('opt') > 0:
+#         matplotlib.pyplot.plot(plot_vector, [shd_matrix_pc_opt[i].count(0)/len(shd_matrix_pc_opt[i]) for i in range(len(shd_matrix_pc_opt))], label = 'pc_opt', color='orange', marker="o", linestyle='dashed')
+#     if alg_vector.count('pc') > 0 and alg_vector.count('true') > 0:
+#         matplotlib.pyplot.plot(plot_vector, [shd_matrix_pc_true[i].count(0)/len(shd_matrix_pc_true[i]) for i in range(len(shd_matrix_pc_true))], label = 'pc_true', color='orange', marker="o",)
+#     if alg_vector.count('mmhc') > 0 and alg_vector.count('opt') > 0:
+#         matplotlib.pyplot.plot(plot_vector, [shd_matrix_mmhc_opt[i].count(0)/len(shd_matrix_mmhc_opt[i]) for i in range(len(shd_matrix_mmhc_opt))], label = 'mmhc_opt', color='cyan', marker="s", linestyle='dashed')
+#     if alg_vector.count('mmhc') > 0 and alg_vector.count('true') > 0:
+#         matplotlib.pyplot.plot(plot_vector, [shd_matrix_mmhc_true[i].count(0)/len(shd_matrix_mmhc_true[i]) for i in range(len(shd_matrix_mmhc_true))], label = 'mmhc_true', color='cyan', marker="s")
+#     if alg_vector.count('ges') > 0 and alg_vector.count('opt') > 0:
+#         matplotlib.pyplot.plot(plot_vector, [shd_matrix_ges_opt[i].count(0)/len(shd_matrix_ges_opt[i]) for i in range(len(shd_matrix_ges_opt))], label = 'ges_opt', color='blue', marker="d", linestyle='dashed')
+#     if alg_vector.count('ges') > 0 and alg_vector.count('true') > 0:
+#         matplotlib.pyplot.plot(plot_vector, [shd_matrix_ges_true[i].count(0)/len(shd_matrix_ges_true[i]) for i in range(len(shd_matrix_ges_true))], label = 'ges_true', color='blue', marker="d")
+#     if alg_vector.count('ske') > 0 and alg_vector.count('opt') > 0:
+#         matplotlib.pyplot.plot(plot_vector, [shd_matrix_ske_opt[i].count(0)/len(shd_matrix_ske_opt[i]) for i in range(len(shd_matrix_ske_opt))], label = 'ske_opt', color='red', marker="v", linestyle='dashed')
+#     if alg_vector.count('ske') > 0 and alg_vector.count('true') > 0:
+#         matplotlib.pyplot.plot(plot_vector, [shd_matrix_ske_true[i].count(0)/len(shd_matrix_ske_true[i]) for i in range(len(shd_matrix_ske_true))], label = 'ske_true', color='red', marker="v")
+#     if alg_vector.count('opt') > 0 and alg_vector.count('true') > 0:
+#         matplotlib.pyplot.plot(plot_vector, [shd_matrix_opt_true[i].count(0)/len(shd_matrix_opt_true[i]) for i in range(len(shd_matrix_opt_true))], label = 'opt_true', color='green', marker="x")
+#     matplotlib.pyplot.legend(loc = 'upper right')
+#     matplotlib.pyplot.ylim(0,1)
+#     matplotlib.pyplot.xlim(0.5,7)
+#
+#
+#     matplotlib.pyplot.savefig(dataset_path + "prop_of_agree_nodes-"+str(nodes)+"_sample-"+str(samples_no)+"_alpha-"+str(alpha)+".pdf")
+#     matplotlib.pyplot.show()
+#
+#     # Plot average number of steps taken
+#     matplotlib.pyplot.title("Average number of steps taken: "+str(nodes))
+#     if alg_vector.count('gcim') > 0:
+#         matplotlib.pyplot.plot(plot_vector, [sum(step_matrix_gcim[i])/len(step_matrix_gcim[i]) for i in range(len(step_matrix_gcim))], label = 'gcim_steps', color='magenta', marker="^")
+#     if alg_vector.count('ges_gcim') > 0:
+#         matplotlib.pyplot.plot(plot_vector, [sum(step_matrix_ges_gcim[i])/len(step_matrix_ges_gcim[i]) for i in range(len(step_matrix_ges_gcim))], label = 'ges_gcim_steps', color='turquoise', marker="x")
+#     if alg_vector.count('ske') > 0:
+#         matplotlib.pyplot.plot(plot_vector, [sum(step_matrix_ske[i])/len(step_matrix_ske[i]) for i in range(len(step_matrix_ske))], label = 'ske_steps', color='red',  marker="v")
+#     if alg_vector.count('gcim_b') > 0:
+#         matplotlib.pyplot.plot(plot_vector, [sum(step_matrix_gcim_b[i])/len(step_matrix_gcim_b[i]) for i in range(len(step_matrix_gcim_b))], label = 'gcim_b_steps', color='orange')
+#     if alg_vector.count('gcim_phased_b') > 0:
+#         matplotlib.pyplot.plot(plot_vector, [sum(step_matrix_gcim_phased_b[i])/len(step_matrix_gcim_phased_b[i]) for i in range(len(step_matrix_gcim_phased_b))], label = 'gcim_phased_b_steps', color='yellow', marker='X')
+#     matplotlib.pyplot.legend(loc = 'right')
+#     matplotlib.pyplot.xlim(0.5,7)
+#
+#
+#     matplotlib.pyplot.savefig(dataset_path + "avg_no_steps_nodes-"+str(nodes)+".pdf")
+#     matplotlib.pyplot.show()
 
 
 
