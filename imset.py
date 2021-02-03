@@ -2440,8 +2440,8 @@ def try_turns_b(input_imset, input_score, input_BIC, show_steps= False):
 
 # The data is collected from dataset_path"nodes-"no_nodes/dataset_type"-"dataset_type_run[model_name/graph_name]
 # Choose your dataset and algorithms
-models_name = ["model-"+str(i)+".csv" for i in range(1,101)]
-graph_name = ["true-graph-"+str(i)+".csv" for i in range(1,101)]
+models_name = ["model-"+str(i)+".csv" for i in range(1,3)]
+graph_name = ["true-graph-"+str(i)+".csv" for i in range(1,3)]
 no_nodes = [8]
 samples_no = 10000 # For writing in result-file and dataset_path
 dataset_type = "nbh"
@@ -2648,7 +2648,7 @@ for nodes in no_nodes:
         result_file.close()
 print("Run completed.")
 print("Local clock:", time.asctime(time.localtime(time.time())))
-pygame.mixer.music.play()
+
 
 
 
