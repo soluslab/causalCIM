@@ -1105,13 +1105,13 @@ def read_dag(input_file):
 
 # Run the implementation of greedySP from uhlerlab/causaldag
 
-def greedySP(input_data):
+def greedySP(input_data, input_cut_off = 1e-3):
     data_matrix = numpy.genfromtxt(input_data, delimiter=',')
     data_matrix = data_matrix[1:, 1:]
     nnodes = len(data_matrix[0])
     suffstat = partial_correlation_suffstat(data_matrix)
-    ci_tester = MemoizedCI_Tester(partial_correlation_test, suffstat, alpha=1e-3)
-    est_dag = cd.structure_learning.gsp(set(range(nnodes)), ci_tester,None,1)
+    ci_tester = MemoizedCI_Tester(partial_correlation_test, suffstat, alpha=input_cut_off)
+    est_dag = cd.structure_learning.gsp(set(range(nnodes)), ci_tester, None, 1)
     # est_dag = cd.sparsest_permutation(set(range(nnodes)), ci_tester)
     est_cpdag = est_dag.cpdag()
     return pdag2dag(igraph.Graph.Adjacency(est_cpdag.to_amat()[0].tolist()))
@@ -2441,8 +2441,8 @@ def try_turns_b(input_imset, input_score, input_BIC, show_steps= False):
 
 # The data is collected from dataset_path"nodes-"no_nodes/dataset_type"-"dataset_type_run[model_name/graph_name]
 # Choose your dataset and algorithms
-models_name = ["model-"+str(i)+".csv" for i in range(1,101)]
-graph_name = ["true-graph-"+str(i)+".csv" for i in range(1,101)]
+models_name = ["model-"+str(i)+".csv" for i in range(1,3)]
+graph_name = ["true-graph-"+str(i)+".csv" for i in range(1,3)]
 no_nodes = [8]
 samples_no = 10000 # For writing in result-file and dataset_path
 dataset_type = "nbh"
@@ -2528,7 +2528,7 @@ for nodes in no_nodes:
                 score_vector_mmhc.append(score_BIC(BIC, return_mmhc_dag))
             # Do greedySP
             if alg_vector.count('greedySP') > 0:
-                return_greedySP_dag = greedySP(DATA)
+                return_greedySP_dag = greedySP(DATA, alpha)
                 score_vector_greedySP.append(score_BIC(BIC,return_greedySP_dag))
             # Do the gcim
             if alg_vector.count('gcim') > 0:
@@ -2649,7 +2649,7 @@ for nodes in no_nodes:
         result_file.close()
 print("Run completed.")
 print("Local clock:", time.asctime(time.localtime(time.time())))
-pygame.mixer.music.play()
+
 
 
 
