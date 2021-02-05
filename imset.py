@@ -1111,7 +1111,8 @@ def greedySP(input_data):
     nnodes = len(data_matrix[0])
     suffstat = partial_correlation_suffstat(data_matrix)
     ci_tester = MemoizedCI_Tester(partial_correlation_test, suffstat, alpha=1e-3)
-    est_dag = cd.sparsest_permutation(set(range(nnodes)), ci_tester)
+    est_dag = cd.structure_learning.gsp(set(range(nnodes)), ci_tester,None,1)
+    # est_dag = cd.sparsest_permutation(set(range(nnodes)), ci_tester)
     est_cpdag = est_dag.cpdag()
     return pdag2dag(igraph.Graph.Adjacency(est_cpdag.to_amat()[0].tolist()))
 
