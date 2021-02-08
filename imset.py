@@ -84,6 +84,17 @@ matplotlib.pyplot.style.use('classic')
 # For printing time
 import time
 
+# To play alert sound when doing long runs
+sound_loaded = True
+try:
+    import pygame
+    pygame.mixer.init()
+    pygame.mixer.music.load("alert.wav")
+    print("Sound loaded successfully")
+except (ModuleNotFoundError, ImportError, FileNotFoundError, pygame.error) as e:
+    print("Sound not loaded, got error: " + str(e))
+    sound_loaded = False
+
 
 # Produce all sets of size 2 or greater in a list.
 # The return list is ordered in colexiographic order.
@@ -451,7 +462,80 @@ def small_imset2pdag(input_imset):
 # RETURNS: A DAG
 
 def imset2dag(input_imset):
-    return pdag2dag(imset2pdag(input_imset))
+    if input_imset == []:
+        raise ValueError("Imset cannot be empty.")
+    nodes = len(input_imset[-1][0])
+    graph = igraph.Graph(nodes, directed = True)
+    
+    # Add edges according to the 2-sets
+    for i in range(nodes):
+        for j in range(i+1, nodes):
+            if (input_imset[set2imset_pos({i,j})][1] == 1):
+                graph.add_edge(i,j)
+                graph.add_edge(j,i)
+    
+    # Add v-structures according to the 3-sets
+    for i in range(nodes):
+        for j in range(i+1, nodes):
+            for k in range(j+1,nodes):
+                if (input_imset[set2imset_pos({i,j,k})][1] == 1):
+                    
+                    edge_ij = input_imset[set2imset_pos({i,j})][1]
+                    edge_ik = input_imset[set2imset_pos({i,k})][1]
+                    edge_jk = input_imset[set2imset_pos({j,k})][1]
+                    check = False
+                    if edge_ij+edge_ik+edge_jk < 2:
+                        pass
+                    elif edge_ij+edge_ik+edge_jk == 3:
+                        check = True
+                    elif (edge_ij == 0):
+                        check = True
+                        try:
+                            graph.delete_edges([(k,i)])
+                        except ValueError:
+                            pass
+                        try:
+                            graph.delete_edges([(k,j)])
+                        except ValueError:
+                            pass
+                    elif (edge_ik == 0):
+                        check = True
+                        try:
+                            graph.delete_edges([(j,i)])
+                        except ValueError:
+                            pass
+                        try:
+                            graph.delete_edges([(j,k)])
+                        except ValueError:
+                            pass
+                    elif (edge_jk == 0):
+                        check = True
+                        try:
+                            graph.delete_edges([(i,j)])
+                        except ValueError:
+                            pass
+                        try:
+                            graph.delete_edges([(i,k)])
+                        except ValueError:
+                            pass
+                    
+                    # If we have not created a v-structure or the imset is complete, somethings wrong.
+                    if not check:
+                        raise ValueError("The imset is not consistent with a DAG")
+                    
+                else:
+                    edge_ij = input_imset[set2imset_pos({i,j})][1]
+                    edge_ik = input_imset[set2imset_pos({i,k})][1]
+                    edge_jk = input_imset[set2imset_pos({j,k})][1]
+                    if edge_ij+edge_ik+edge_jk == 3:
+                        raise ValueError("The imset is not consistent with a DAG")
+    # We need to do a final check to see if everything is alright.
+    # We need small_imset(pdag2dag(graph)) = imset2small_imset(input_imset)
+    ret_graph = pdag2dag(graph)
+    if not is_equal(imset(ret_graph), input_imset):
+        raise ValueError("The imset is not consistent with a DAG")
+    return ret_graph
+
 
 
 # Takes a small_imset and returns a directed graph
@@ -1112,7 +1196,6 @@ def greedySP(input_data, input_cut_off = 1e-3):
     suffstat = partial_correlation_suffstat(data_matrix)
     ci_tester = MemoizedCI_Tester(partial_correlation_test, suffstat, alpha=input_cut_off)
     est_dag = cd.structure_learning.gsp(set(range(nnodes)), ci_tester, None, 1)
-    # est_dag = cd.sparsest_permutation(set(range(nnodes)), ci_tester)
     est_cpdag = est_dag.cpdag()
     return pdag2dag(igraph.Graph.Adjacency(est_cpdag.to_amat()[0].tolist()))
 
@@ -1302,7 +1385,7 @@ def naive_search(input_imsetlist, input_BIC):
 # Has option showsteps to print the steps taken.
 # Can turn off the edge and/or the turn phase of the algorithm. 
 
-def gcim(input_BIC, input_graph = None, input_imset = None, showsteps = False, edge_phase = True, turn_phase = True):
+def gcim(input_BIC, input_graph = None, input_imset = None, showsteps = False, phases = ["edge", "turning"]):
     if isinstance(input_graph, igraph.Graph):
         nodes = input_graph.vcount()
         start_imset = imset(input_graph)
@@ -1317,6 +1400,14 @@ def gcim(input_BIC, input_graph = None, input_imset = None, showsteps = False, e
         start_dag = igraph.Graph(nodes, directed = True)
         start_imset = imset(start_dag)
         start_score = score_BIC(input_BIC, start_dag)
+    if phases.count("edge") > 0:
+        edge_phase = True
+    else:
+        edge_phase = False
+    if phases.count("turning") > 0:
+        turn_phase = True
+    else:
+        turn_phase = False
     total_steps = 0
     temp_int = 1
     temp_steps = -1
@@ -1327,6 +1418,7 @@ def gcim(input_BIC, input_graph = None, input_imset = None, showsteps = False, e
         while (temp_int > 0 and edge_phase):
             temp_imset, temp_int, temp_score = try_edges(temp_imset, temp_score, input_BIC, show_steps= showsteps)
             total_steps += temp_int
+        temp_int = 1
         while (temp_int > 0 and turn_phase):
             temp_imset, temp_int, temp_score = try_turns(temp_imset, temp_score, input_BIC, show_steps= showsteps)
             total_steps += temp_int
@@ -1340,7 +1432,7 @@ def gcim(input_BIC, input_graph = None, input_imset = None, showsteps = False, e
 # turning phase, then removes edges and 
 # turning phases.
 
-def gcim_phased(input_BIC, input_graph = None, input_imset = None, showsteps = False, edge_phase = True, turn_phase = True):
+def gcim_phased(input_BIC, input_graph = None, input_imset = None, showsteps = False, phases = ["forward", "backward", "turning"]):
     if isinstance(input_graph, igraph.Graph):
         nodes = input_graph.vcount()
         start_imset = imset(input_graph)
@@ -1355,6 +1447,18 @@ def gcim_phased(input_BIC, input_graph = None, input_imset = None, showsteps = F
         start_dag = igraph.Graph(nodes, directed = True)
         start_imset = imset(start_dag)
         start_score = score_BIC(input_BIC, start_dag)
+    if phases.count("forward") > 0:
+        forward_phase = True
+    else:
+        forward_phase = False
+    if phases.count("backward") > 0:
+        backward_phase = True
+    else:
+        backward_phase = False
+    if phases.count("turning") > 0:
+        turn_phase = True
+    else:
+        turn_phase = False
     total_steps = 0
     temp_steps = -1
     temp_int = 1
@@ -1362,9 +1466,10 @@ def gcim_phased(input_BIC, input_graph = None, input_imset = None, showsteps = F
     temp_score = start_score
     while (total_steps > temp_steps):
         temp_steps = total_steps
-        while (temp_int > 0 and edge_phase):
+        while (temp_int > 0 and forward_phase):
             temp_imset, temp_int, temp_score = try_edges_additions(temp_imset, temp_score, input_BIC, show_steps= showsteps)
             total_steps += temp_int
+        temp_int = 1
         while (temp_int > 0 and turn_phase):
             temp_imset, temp_int, temp_score = try_turns(temp_imset, temp_score, input_BIC, show_steps= showsteps)
             total_steps += temp_int
@@ -1372,9 +1477,10 @@ def gcim_phased(input_BIC, input_graph = None, input_imset = None, showsteps = F
     temp_int = 1
     while (total_steps > temp_steps):
         temp_steps = total_steps
-        while (temp_int > 0 and edge_phase):
+        while (temp_int > 0 and backward_phase):
             temp_imset, temp_int, temp_score = try_edges_removals(temp_imset, temp_score, input_BIC, show_steps= showsteps)
             total_steps += temp_int
+        temp_int = 1
         while (temp_int > 0 and turn_phase):
             temp_imset, temp_int, temp_score = try_turns(temp_imset, temp_score, input_BIC, show_steps= showsteps)
             total_steps += temp_int
@@ -1986,10 +2092,10 @@ def try_edges_removals(input_imset, input_score, input_BIC, show_steps= False):
 # creating the best score).
 
 
-# A breadth first version of the Greedy CIM.
+# A breadth-first version of the Greedy CIM.
 # See 'gcim' for better documentation.
 
-def gcim_b(input_BIC, input_graph = None, input_imset = None, showsteps = False, edge_phase = True, turn_phase = True):
+def gcim_b(input_BIC, input_graph = None, input_imset = None, showsteps = False, phases = ["edge", "turning"]):
     if isinstance(input_graph, igraph.Graph):
         nodes = input_graph.vcount()
         start_imset = imset(input_graph)
@@ -2004,6 +2110,14 @@ def gcim_b(input_BIC, input_graph = None, input_imset = None, showsteps = False,
         start_dag = igraph.Graph(nodes, directed = True)
         start_imset = imset(start_dag)
         start_score = score_BIC(input_BIC, start_dag)
+    if phases.count("edge") > 0:
+        edge_phase = True
+    else:
+        edge_phase = False
+    if phases.count("turning") > 0:
+        turn_phase = True
+    else: 
+        turn_phase = False
     total_steps = 0
     temp_int = 1
     temp_steps = -1
@@ -2011,10 +2125,11 @@ def gcim_b(input_BIC, input_graph = None, input_imset = None, showsteps = False,
     temp_imset = start_imset
     while (total_steps > temp_steps):
         temp_steps = total_steps
-        while (temp_int > 0):
+        while (temp_int > 0 and edge_phase):
             temp_imset, temp_int, temp_score = try_edges_b(temp_imset, temp_score, input_BIC, show_steps= showsteps)
             total_steps += temp_int
-        while (temp_int > 0):
+        temp_int = 1
+        while (temp_int > 0 and turn_phase):
             temp_imset, temp_int, temp_score = try_turns_b(temp_imset, temp_score, input_BIC, show_steps= showsteps)
             total_steps += temp_int
         
@@ -2026,7 +2141,7 @@ def gcim_b(input_BIC, input_graph = None, input_imset = None, showsteps = False,
 # greedy CIM. See 'gcim' for better 
 # documentation.
 
-def gcim_phased_b(input_BIC, input_graph = None, input_imset = None, showsteps = False, edge_phase = True, turn_phase = True):
+def gcim_phased_b(input_BIC, input_graph = None, input_imset = None, showsteps = False, phases = ["forward", "backward", "turning"]):
     if isinstance(input_graph, igraph.Graph):
         nodes = input_graph.vcount()
         start_imset = imset(input_graph)
@@ -2041,6 +2156,18 @@ def gcim_phased_b(input_BIC, input_graph = None, input_imset = None, showsteps =
         start_dag = igraph.Graph(nodes, directed = True)
         start_imset = imset(start_dag)
         start_score = score_BIC(input_BIC, start_dag)
+    if phases.count("forward") > 0:
+        forward_phase = True
+    else:
+        forward_phase = False
+    if phases.count("backward") > 0:
+        backward_phase = True
+    else:
+        backward_phase = False
+    if phases.count("turning") > 0:
+        turn_phase = True
+    else: 
+        turn_phase = False
     total_steps = 0
     temp_steps = -1
     temp_int = 1
@@ -2048,9 +2175,10 @@ def gcim_phased_b(input_BIC, input_graph = None, input_imset = None, showsteps =
     temp_score = start_score
     while (total_steps > temp_steps):
         temp_steps = total_steps
-        while (temp_int > 0 and edge_phase):
+        while (temp_int > 0 and forward_phase):
             temp_imset, temp_int, temp_score = try_edges_additions_b(temp_imset, temp_score, input_BIC, show_steps= showsteps)
             total_steps += temp_int
+        temp_int = 1
         while (temp_int > 0 and turn_phase):
             temp_imset, temp_int, temp_score = try_turns_b(temp_imset, temp_score, input_BIC, show_steps= showsteps)
             total_steps += temp_int
@@ -2058,14 +2186,68 @@ def gcim_phased_b(input_BIC, input_graph = None, input_imset = None, showsteps =
     temp_int = 1
     while (total_steps > temp_steps):
         temp_steps = total_steps
-        while (temp_int > 0 and edge_phase):
+        while (temp_int > 0 and backward_phase):
             temp_imset, temp_int, temp_score = try_edges_removals_b(temp_imset, temp_score, input_BIC, show_steps= showsteps)
             total_steps += temp_int
+        temp_int = 1
         while (temp_int > 0 and turn_phase):
             temp_imset, temp_int, temp_score = try_turns_b(temp_imset, temp_score, input_BIC, show_steps= showsteps)
             total_steps += temp_int
     
-    return temp_imset, temp_score, total_steps
+    return temp_imset, temp_score, total_steps  
+
+
+# A reccurent phased breadth-first version of 
+# greedy CIM. It replicates the GIES. See 'gcim'
+# for better documentation.
+
+def gcim_rec_phased_b(input_BIC, input_graph = None, input_imset = None, showsteps = False, phases = ["forward", "backward", "turning"]):
+    if isinstance(input_graph, igraph.Graph):
+        nodes = input_graph.vcount()
+        start_imset = imset(input_graph)
+        start_score = score_BIC(input_BIC, input_graph)
+    elif input_graph != None:
+        raise ValueError("Input graph needs to be an instance of igraph.Graph")
+    elif input_imset != None:
+        start_imset = input_imset
+        start_score = score_BIC(input_BIC, imset2dag(input_imset))
+    else:
+        nodes = len(rbase.__dict__["$"](input_BIC, ".nodes"))
+        start_dag = igraph.Graph(nodes, directed = True)
+        start_imset = imset(start_dag)
+        start_score = score_BIC(input_BIC, start_dag)
+    if phases.count("forward") > 0:
+        forward_phase = True
+    else:
+        forward_phase = False
+    if phases.count("backward") > 0:
+        backward_phase = True
+    else:
+        backward_phase = False
+    if phases.count("turning") > 0:
+        turn_phase = True
+    else: 
+        turn_phase = False
+    total_steps = 0
+    temp_steps = -1
+    temp_int = 1
+    temp_imset = start_imset
+    temp_score = start_score
+    while (total_steps > temp_steps):
+        temp_steps = total_steps
+        while (temp_int > 0 and forward_phase):
+            temp_imset, temp_int, temp_score = try_edges_additions_b(temp_imset, temp_score, input_BIC, show_steps= showsteps)
+            total_steps += temp_int
+        temp_int = 1
+        while (temp_int > 0 and backward_phase):
+            temp_imset, temp_int, temp_score = try_edges_removals_b(temp_imset, temp_score, input_BIC, show_steps= showsteps)
+            total_steps += temp_int
+        temp_int = 1
+        while (temp_int > 0 and turn_phase):
+            temp_imset, temp_int, temp_score = try_turns_b(temp_imset, temp_score, input_BIC, show_steps= showsteps)
+            total_steps += temp_int
+    
+    return temp_imset, temp_score, total_steps  
 
 
 # A breadth-first version of 
@@ -2447,7 +2629,7 @@ no_nodes = [8]
 samples_no = 10000 # For writing in result-file and dataset_path
 dataset_type = "nbh"
 dataset_type_run = [i/2 for i in range(1, 11)]
-alg_vector_choose = ["ges", 'gies', "mmhc", "greedySP", "pc", "gcim", "ske", "true"]
+alg_vector_choose = ["ges", 'gies', "gcim_rec_phased_b", "mmhc", "greedySP", "pc", "gcim", "ske", "true"]
 alpha = 0.0001 # Cutof limit to be used in pc and ske
 dataset_path = "sim_data_nbh_final/alpha-"+str(alpha)+"/samples-"+str(samples_no)+"/"
 
@@ -2455,7 +2637,7 @@ dataset_path = "sim_data_nbh_final/alpha-"+str(alpha)+"/samples-"+str(samples_no
 # Initiate some variables
 # A sorted version of the alg_vector_choose to make coding easier
 alg_vector = ["ges", "pc", "mmhc", "greedySP", "gcim", "gies", "ges_gcim", "ske", "gcim_phased", "gcim_backwards", "gcim_b",
-              "gcim_phased_b", "opt", "true"]
+              "gcim_phased_b", "gcim_rec_phased_b", "opt", "true"]
 alg_vector_copy = alg_vector.copy()
 for i in alg_vector_copy:
     if alg_vector_choose.count(i) == 0:
@@ -2546,7 +2728,7 @@ for nodes in no_nodes:
                 except ValueError:
                     dir_graph = skeleton_graph.copy()
                     dir_graph.to_directed(mutual = False)
-                return_ske = gcim(BIC, input_graph = dir_graph, edge_phase= False)
+                return_ske = gcim(BIC, input_graph = dir_graph, phases = ["turning"])
                 return_ske_dag = imset2dag(return_ske[0])
                 score_vector_ske.append(return_ske[1])
                 step_vector_ske.append(return_ske[2])
@@ -2576,6 +2758,12 @@ for nodes in no_nodes:
                 return_gcim_phased_b_dag = imset2dag(return_gcim_phased_b[0])
                 score_vector_gcim_phased_b.append(return_gcim_phased_b[1])
                 step_vector_gcim_phased_b.append(return_gcim_phased_b[2])
+            # Do the 'gcim_rec_phased_b'
+            if alg_vector.count('gcim_rec_phased_b') > 0:
+                return_gcim_rec_phased_b = gcim_rec_phased_b(BIC)
+                return_gcim_rec_phased_b_dag = imset2dag(return_gcim_rec_phased_b[0])
+                score_vector_gcim_rec_phased_b.append(return_gcim_rec_phased_b[1])
+                step_vector_gcim_rec_phased_b.append(return_gcim_rec_phased_b[2])
             # Do the 'ges_gcim'
             if alg_vector.count('ges_gcim') > 0:
                 if alg_vector.count('ges') > 0:
@@ -2649,6 +2837,8 @@ for nodes in no_nodes:
         result_file.close()
 print("Run completed.")
 print("Local clock:", time.asctime(time.localtime(time.time())))
+if sound_loaded:
+    pygame.mixer.music.play()
 
 
 
@@ -2691,6 +2881,8 @@ for nodes in no_nodes:
     matplotlib.pyplot.title("Average shd: "+str(nodes))
     if alg_vector.count('ges') > 0 and alg_vector.count('true') > 0:
         matplotlib.pyplot.plot(plot_vector, [sum(shd_matrix_ges_true[i])/len(shd_matrix_ges_true[i]) for i in range(len(shd_matrix_ges_true))], label = 'ges', color='blue', marker="d")
+    if alg_vector.count('gcim_rec_phased_b') > 0 and alg_vector.count('true') > 0:
+        matplotlib.pyplot.plot(plot_vector, [sum(shd_matrix_gcim_rec_phased_b_true[i])/len(shd_matrix_gcim_rec_phased_b_true[i]) for i in range(len(shd_matrix_gcim_rec_phased_b_true))], label = 'gcim_rec_phased_b', color='turquoise', marker="x")
     if alg_vector.count('pc') > 0 and alg_vector.count('true') > 0:
         matplotlib.pyplot.plot(plot_vector, [sum(shd_matrix_pc_true[i])/len(shd_matrix_pc_true[i]) for i in range(len(shd_matrix_pc_true))], label = 'pc', color='orange', marker="o")
     if alg_vector.count('mmhc') > 0 and alg_vector.count('true') > 0:
@@ -2712,6 +2904,8 @@ for nodes in no_nodes:
     matplotlib.pyplot.title("Models recovered")
     if alg_vector.count('gcim') > 0 and alg_vector.count('true') > 0:
         matplotlib.pyplot.plot(plot_vector, [shd_matrix_gcim_true[i].count(0)/len(shd_matrix_gcim_true[i]) for i in range(len(shd_matrix_gcim_true))], label = 'gcim', color='magenta', marker="^")
+    if alg_vector.count('gcim_rec_phased_b') > 0 and alg_vector.count('true') > 0:
+        matplotlib.pyplot.plot(plot_vector, [shd_matrix_gcim_rec_phased_b_true[i].count(0)/len(shd_matrix_gcim_rec_phased_b_true[i]) for i in range(len(shd_matrix_gcim_rec_phased_b_true))], label = 'gcim_rec_phased_b', color='turquoise', marker="x")
     if alg_vector.count('gies') > 0 and alg_vector.count('true') > 0:
         matplotlib.pyplot.plot(plot_vector, [shd_matrix_gies_true[i].count(0)/len(shd_matrix_gies_true[i]) for i in range(len(shd_matrix_gies_true))], label = 'gies', color='lime', marker="X")
     if alg_vector.count('pc') > 0 and alg_vector.count('true') > 0:
@@ -2735,6 +2929,8 @@ for nodes in no_nodes:
     matplotlib.pyplot.title("Average number of steps taken: " + str(nodes)) 
     if alg_vector.count('gcim') > 0:
         matplotlib.pyplot.plot(plot_vector, [sum(step_matrix_gcim[i])/len(step_matrix_gcim[i]) for i in range(len(step_matrix_gcim))], label = 'gcim_steps', color='magenta', marker="^")
+    if alg_vector.count('gcim_rec_phased_b') > 0:
+        matplotlib.pyplot.plot(plot_vector, [sum(step_matrix_gcim_rec_phased_b[i])/len(step_matrix_gcim_rec_phased_b[i]) for i in range(len(step_matrix_gcim_rec_phased_b))], label = 'gcim_rec_phased_b', color='turquoise', marker="x")
     if alg_vector.count('ske') > 0:
         matplotlib.pyplot.plot(plot_vector, [sum(step_matrix_ske[i])/len(step_matrix_ske[i]) for i in range(len(step_matrix_ske))], label = 'ske_steps', color='red',  marker="v")
     matplotlib.pyplot.legend(loc = 'right')
