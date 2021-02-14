@@ -1409,12 +1409,12 @@ def gcim(input_BIC, input_graph = None, input_imset = None, showsteps = False, p
     else:
         turn_phase = False
     total_steps = 0
-    temp_int = 1
     temp_steps = -1
     temp_imset = start_imset
     temp_score = start_score
     while (total_steps > temp_steps):
         temp_steps = total_steps
+        temp_int = 1
         while (temp_int > 0 and edge_phase):
             temp_imset, temp_int, temp_score = try_edges(temp_imset, temp_score, input_BIC, show_steps= showsteps)
             total_steps += temp_int
@@ -1461,11 +1461,11 @@ def gcim_phased(input_BIC, input_graph = None, input_imset = None, showsteps = F
         turn_phase = False
     total_steps = 0
     temp_steps = -1
-    temp_int = 1
     temp_imset = start_imset
     temp_score = start_score
     while (total_steps > temp_steps):
         temp_steps = total_steps
+        temp_int = 1
         while (temp_int > 0 and forward_phase):
             temp_imset, temp_int, temp_score = try_edges_additions(temp_imset, temp_score, input_BIC, show_steps= showsteps)
             total_steps += temp_int
@@ -1474,9 +1474,9 @@ def gcim_phased(input_BIC, input_graph = None, input_imset = None, showsteps = F
             temp_imset, temp_int, temp_score = try_turns(temp_imset, temp_score, input_BIC, show_steps= showsteps)
             total_steps += temp_int
     temp_steps = -1
-    temp_int = 1
     while (total_steps > temp_steps):
         temp_steps = total_steps
+        temp_int = 1
         while (temp_int > 0 and backward_phase):
             temp_imset, temp_int, temp_score = try_edges_removals(temp_imset, temp_score, input_BIC, show_steps= showsteps)
             total_steps += temp_int
@@ -2119,12 +2119,12 @@ def gcim_b(input_BIC, input_graph = None, input_imset = None, showsteps = False,
     else: 
         turn_phase = False
     total_steps = 0
-    temp_int = 1
     temp_steps = -1
     temp_score = start_score
     temp_imset = start_imset
     while (total_steps > temp_steps):
         temp_steps = total_steps
+        temp_int = 1
         while (temp_int > 0 and edge_phase):
             temp_imset, temp_int, temp_score = try_edges_b(temp_imset, temp_score, input_BIC, show_steps= showsteps)
             total_steps += temp_int
@@ -2170,11 +2170,11 @@ def gcim_phased_b(input_BIC, input_graph = None, input_imset = None, showsteps =
         turn_phase = False
     total_steps = 0
     temp_steps = -1
-    temp_int = 1
     temp_imset = start_imset
     temp_score = start_score
     while (total_steps > temp_steps):
         temp_steps = total_steps
+        temp_int = 1
         while (temp_int > 0 and forward_phase):
             temp_imset, temp_int, temp_score = try_edges_additions_b(temp_imset, temp_score, input_BIC, show_steps= showsteps)
             total_steps += temp_int
@@ -2183,9 +2183,9 @@ def gcim_phased_b(input_BIC, input_graph = None, input_imset = None, showsteps =
             temp_imset, temp_int, temp_score = try_turns_b(temp_imset, temp_score, input_BIC, show_steps= showsteps)
             total_steps += temp_int
     temp_steps = -1
-    temp_int = 1
     while (total_steps > temp_steps):
         temp_steps = total_steps
+        temp_int = 1
         while (temp_int > 0 and backward_phase):
             temp_imset, temp_int, temp_score = try_edges_removals_b(temp_imset, temp_score, input_BIC, show_steps= showsteps)
             total_steps += temp_int
@@ -2230,11 +2230,11 @@ def gcim_rec_phased_b(input_BIC, input_graph = None, input_imset = None, showste
         turn_phase = False
     total_steps = 0
     temp_steps = -1
-    temp_int = 1
     temp_imset = start_imset
     temp_score = start_score
     while (total_steps > temp_steps):
         temp_steps = total_steps
+        temp_int = 1
         while (temp_int > 0 and forward_phase):
             temp_imset, temp_int, temp_score = try_edges_additions_b(temp_imset, temp_score, input_BIC, show_steps= showsteps)
             total_steps += temp_int
@@ -2629,7 +2629,7 @@ no_nodes = [8]
 samples_no = 10000 # For writing in result-file and dataset_path
 dataset_type = "nbh"
 dataset_type_run = [i/2 for i in range(1, 11)]
-alg_vector_choose = ["ges", 'gies', "gcim_rec_phased_b", "mmhc", "greedySP", "pc", "gcim", "ske", "true"]
+alg_vector_choose = ["ges", 'gies', "mmhc", "greedySP", "pc", "gcim", "gcim_rec_phased_b", "ske", "true"]
 alpha = 0.0001 # Cutof limit to be used in pc and ske
 dataset_path = "sim_data_nbh_final/alpha-"+str(alpha)+"/samples-"+str(samples_no)+"/"
 
@@ -2680,6 +2680,9 @@ for nodes in no_nodes:
             for algo in alg_vector:
                 if algo != 'true':
                     exec("shd_vector_" + algo + "_true = []")
+
+        # Skeleton result vector
+        skeleton_result_vector = []
 
         # Run the algorithms
         print("[", end = "")
@@ -2795,6 +2798,13 @@ for nodes in no_nodes:
                 for algo in alg_vector:
                     if algo != 'true':
                         eval("shd_vector_" + algo + "_true.append(shd(return_" + algo + "_dag, return_true_dag))")
+                        
+            # Save if skeleton got the correct result
+            if alg_vector.count('true') > 0 and alg_vector.count('ske') > 0:
+                if imset_cutof(small_imset(return_true_dag), 2) == imset_cutof(small_imset(return_ske_dag), 2):
+                    skeleton_result_vector.append(1)
+                else:
+                    skeleton_result_vector.append(0)
             
             # Save the dags as edgelists for future reference
             return_dags_vector_temp = []
@@ -2832,7 +2842,15 @@ for nodes in no_nodes:
         
         # Write the step vectors.
         for algo in step_count_alg:
-            result_file.write("step_vector_" + algo + "="+str(eval("step_vector_" + algo)) + "\n\n")
+            result_file.write("step_vector_" + algo + "="+str(eval("step_vector_" + algo)) + "\n")
+
+        # Write the skeleton_result_vector
+        if len(skeleton_result_vector) > 0:
+            result_file.write("skeleton_result_vector=" + str(skeleton_result_vector) + "\n")
+
+        # Write the edgelists
+        result_file.write("return_dags_vector=" + str(return_dags_vector) + "\n" )
+
         # Close the result file
         result_file.close()
 print("Run completed.")
@@ -2860,82 +2878,94 @@ for nodes in no_nodes:
     for algo in step_count_alg:
         exec("step_matrix_"+algo+" = []")
     
+    # Skeleton result matrix
+    skeleton_result_matrix = []
+    
+    
     # Get the data as a big matrix and fetch the plotting data
     for run in dataset_type_run:
-        data_matrix = numpy.genfromtxt(dataset_path + "nodes-" + str(nodes) + "/" + dataset_type + "-" + str(run) + "/results.txt", dtype=None, delimiter = '=', encoding=None)
+        data_matrix = numpy.genfromtxt(dataset_path + "nodes-"+ str(nodes)+"/"+dataset_type+"-" +str(run)+ "/results.txt", dtype=None, delimiter = '=', encoding=None)
         
         for i in range(len(data_matrix)):
             for algo in alg_vector:
-                if data_matrix[i][0] == "shd dist " + algo + " to true":
-                    exec("shd_matrix_" + algo + "_true.append(eval(data_matrix[i][1]))")
+                if data_matrix[i][0] == "shd dist "+algo+" to true":
+                    exec("shd_matrix_"+algo+"_true.append(eval(data_matrix[i][1]))")
                     break
-                elif data_matrix[i][0] == "shd dist " + algo + " to opt":
-                    exec("shd_matrix_" + algo + "_opt.append(eval(data_matrix[i][1]))")
+                elif data_matrix[i][0] == "shd dist "+algo+" to opt":
+                    exec("shd_matrix_"+algo+"_opt.append(eval(data_matrix[i][1]))")
                     break
-                elif data_matrix[i][0] == "step_vector_" + algo:
-                    exec("step_matrix_" + algo + ".append(eval(data_matrix[i][1]))")
+                elif data_matrix[i][0] == "step_vector_"+algo:
+                    exec("step_matrix_"+algo+".append(eval(data_matrix[i][1]))")
+            if data_matrix[i][0] == "skeleton_result_vector":
+                skeleton_result_matrix.append(eval(data_matrix[i][1]))
             
     
     # Plot the average structural hamming distance between 
     # the true model and the return of the algorithms.
-    matplotlib.pyplot.title("Average shd: "+str(nodes))
     if alg_vector.count('ges') > 0 and alg_vector.count('true') > 0:
-        matplotlib.pyplot.plot(plot_vector, [sum(shd_matrix_ges_true[i])/len(shd_matrix_ges_true[i]) for i in range(len(shd_matrix_ges_true))], label = 'ges', color='blue', marker="d")
-    if alg_vector.count('gcim_rec_phased_b') > 0 and alg_vector.count('true') > 0:
-        matplotlib.pyplot.plot(plot_vector, [sum(shd_matrix_gcim_rec_phased_b_true[i])/len(shd_matrix_gcim_rec_phased_b_true[i]) for i in range(len(shd_matrix_gcim_rec_phased_b_true))], label = 'gcim_rec_phased_b', color='turquoise', marker="x")
+        matplotlib.pyplot.plot(plot_vector, [sum(shd_matrix_ges_true[i])/len(shd_matrix_ges_true[i]) for i in range(len(shd_matrix_ges_true))], label = 'GES', color='blue', marker="d")
     if alg_vector.count('pc') > 0 and alg_vector.count('true') > 0:
-        matplotlib.pyplot.plot(plot_vector, [sum(shd_matrix_pc_true[i])/len(shd_matrix_pc_true[i]) for i in range(len(shd_matrix_pc_true))], label = 'pc', color='orange', marker="o")
+        matplotlib.pyplot.plot(plot_vector, [sum(shd_matrix_pc_true[i])/len(shd_matrix_pc_true[i]) for i in range(len(shd_matrix_pc_true))], label = 'PC', color='orange', marker="o")
     if alg_vector.count('mmhc') > 0 and alg_vector.count('true') > 0:
-        matplotlib.pyplot.plot(plot_vector, [sum(shd_matrix_mmhc_true[i])/len(shd_matrix_mmhc_true[i]) for i in range(len(shd_matrix_mmhc_true))], label = 'mmhc', color='cyan', marker="s")
+        matplotlib.pyplot.plot(plot_vector, [sum(shd_matrix_mmhc_true[i])/len(shd_matrix_mmhc_true[i]) for i in range(len(shd_matrix_mmhc_true))], label = 'MMHC', color='cyan', marker="s")
     if alg_vector.count('greedySP') > 0 and alg_vector.count('true') > 0:
         matplotlib.pyplot.plot(plot_vector, [sum(shd_matrix_greedySP_true[i])/len(shd_matrix_greedySP_true[i]) for i in range(len(shd_matrix_greedySP_true))], label = 'greedySP', color='pink', marker="*")
     if alg_vector.count('gcim') > 0 and alg_vector.count('true') > 0:
-        matplotlib.pyplot.plot(plot_vector, [sum(shd_matrix_gcim_true[i])/len(shd_matrix_gcim_true[i]) for i in range(len(shd_matrix_gcim_true))], label = 'gcim', color='magenta', marker="^")
+        matplotlib.pyplot.plot(plot_vector, [sum(shd_matrix_gcim_true[i])/len(shd_matrix_gcim_true[i]) for i in range(len(shd_matrix_gcim_true))], label = 'greedy CIM', color='magenta', marker="^")
+    if alg_vector.count('gcim_rec_phased_b') > 0 and alg_vector.count('true') > 0:
+        matplotlib.pyplot.plot(plot_vector, [sum(shd_matrix_gcim_rec_phased_b_true[i])/len(shd_matrix_gcim_rec_phased_b_true[i]) for i in range(len(shd_matrix_gcim_rec_phased_b_true))], label = 'gcim_rec_phased_b', color='turquoise', marker="x")
     if alg_vector.count('gies') > 0 and alg_vector.count('true') > 0:
-        matplotlib.pyplot.plot(plot_vector, [sum(shd_matrix_gies_true[i])/len(shd_matrix_gies_true[i]) for i in range(len(shd_matrix_gies_true))], label = 'gies', color='lime', marker="X")
+        matplotlib.pyplot.plot(plot_vector, [sum(shd_matrix_gies_true[i])/len(shd_matrix_gies_true[i]) for i in range(len(shd_matrix_gies_true))], label = 'GIES', color='lime', marker="X")
     if alg_vector.count('ske') > 0 and alg_vector.count('true') > 0:
-        matplotlib.pyplot.plot(plot_vector, [sum(shd_matrix_ske_true[i])/len(shd_matrix_ske_true[i]) for i in range(len(shd_matrix_ske_true))], label = 'ske', color='red', marker="v")
+        matplotlib.pyplot.plot(plot_vector, [sum(shd_matrix_ske_true[i])/len(shd_matrix_ske_true[i]) for i in range(len(shd_matrix_ske_true))], label = 'skeletal greedy CIM', color='red', marker="v")
     matplotlib.pyplot.legend(loc = 'upper left')
     matplotlib.pyplot.xlim(0.5,7)
+    matplotlib.pyplot.xlabel("Expected neighborhood size")
+    matplotlib.pyplot.ylabel("Average SHD to true model")
     
-    matplotlib.pyplot.savefig(dataset_path + "avg_shd_nodes-" + str(nodes) + "_sample-" + str(samples_no) + "_alpha-" + str(alpha) + ".pdf")
+    matplotlib.pyplot.savefig(dataset_path + "avg_shd_nodes-"+str(nodes)+"_sample-"+str(samples_no)+"_alpha-"+str(alpha)+".pdf")
     matplotlib.pyplot.show()
+
     # Plot proportion of time found true graph
-    matplotlib.pyplot.title("Models recovered")
     if alg_vector.count('gcim') > 0 and alg_vector.count('true') > 0:
-        matplotlib.pyplot.plot(plot_vector, [shd_matrix_gcim_true[i].count(0)/len(shd_matrix_gcim_true[i]) for i in range(len(shd_matrix_gcim_true))], label = 'gcim', color='magenta', marker="^")
+        matplotlib.pyplot.plot(plot_vector, [shd_matrix_gcim_true[i].count(0)/len(shd_matrix_gcim_true[i]) for i in range(len(shd_matrix_gcim_true))], label = 'greedy CIM', color='magenta', marker="^")
+    if alg_vector.count('gies') > 0 and alg_vector.count('true') > 0:
+        matplotlib.pyplot.plot(plot_vector, [shd_matrix_gies_true[i].count(0)/len(shd_matrix_gies_true[i]) for i in range(len(shd_matrix_gies_true))], label = 'GIES', color='lime', marker="X")
     if alg_vector.count('gcim_rec_phased_b') > 0 and alg_vector.count('true') > 0:
         matplotlib.pyplot.plot(plot_vector, [shd_matrix_gcim_rec_phased_b_true[i].count(0)/len(shd_matrix_gcim_rec_phased_b_true[i]) for i in range(len(shd_matrix_gcim_rec_phased_b_true))], label = 'gcim_rec_phased_b', color='turquoise', marker="x")
-    if alg_vector.count('gies') > 0 and alg_vector.count('true') > 0:
-        matplotlib.pyplot.plot(plot_vector, [shd_matrix_gies_true[i].count(0)/len(shd_matrix_gies_true[i]) for i in range(len(shd_matrix_gies_true))], label = 'gies', color='lime', marker="X")
+    if alg_vector.count('gcim_backwards') > 0 and alg_vector.count('true') > 0:
+        matplotlib.pyplot.plot(plot_vector, [shd_matrix_gcim_backwards_true[i].count(0)/len(shd_matrix_gcim_backwards_true[i]) for i in range(len(shd_matrix_gcim_backwards_true))], label = 'gcim_backwards', color='violet', marker="P")
     if alg_vector.count('pc') > 0 and alg_vector.count('true') > 0:
-        matplotlib.pyplot.plot(plot_vector, [shd_matrix_pc_true[i].count(0)/len(shd_matrix_pc_true[i]) for i in range(len(shd_matrix_pc_true))], label = 'pc', color='orange', marker="o",)
+        matplotlib.pyplot.plot(plot_vector, [shd_matrix_pc_true[i].count(0)/len(shd_matrix_pc_true[i]) for i in range(len(shd_matrix_pc_true))], label = 'PC', color='orange', marker="o",)
     if alg_vector.count('mmhc') > 0 and alg_vector.count('true') > 0:
-        matplotlib.pyplot.plot(plot_vector, [shd_matrix_mmhc_true[i].count(0)/len(shd_matrix_mmhc_true[i]) for i in range(len(shd_matrix_mmhc_true))], label = 'mmhc', color='cyan', marker="s")
+        matplotlib.pyplot.plot(plot_vector, [shd_matrix_mmhc_true[i].count(0)/len(shd_matrix_mmhc_true[i]) for i in range(len(shd_matrix_mmhc_true))], label = 'MMHC', color='cyan', marker="s")
     if alg_vector.count('greedySP') > 0 and alg_vector.count('true') > 0:
         matplotlib.pyplot.plot(plot_vector, [shd_matrix_greedySP_true[i].count(0)/len(shd_matrix_greedySP_true[i]) for i in range(len(shd_matrix_greedySP_true))], label = 'greedySP', color='pink', marker="*")
     if alg_vector.count('ges') > 0 and alg_vector.count('true') > 0:
-        matplotlib.pyplot.plot(plot_vector, [shd_matrix_ges_true[i].count(0)/len(shd_matrix_ges_true[i]) for i in range(len(shd_matrix_ges_true))], label = 'ges', color='blue', marker="d")
+        matplotlib.pyplot.plot(plot_vector, [shd_matrix_ges_true[i].count(0)/len(shd_matrix_ges_true[i]) for i in range(len(shd_matrix_ges_true))], label = 'GES', color='blue', marker="d")
     if alg_vector.count('ske') > 0 and alg_vector.count('true') > 0:
-        matplotlib.pyplot.plot(plot_vector, [shd_matrix_ske_true[i].count(0)/len(shd_matrix_ske_true[i]) for i in range(len(shd_matrix_ske_true))], label = 'ske', color='red', marker="v")
+        matplotlib.pyplot.plot(plot_vector, [shd_matrix_ske_true[i].count(0)/len(shd_matrix_ske_true[i]) for i in range(len(shd_matrix_ske_true))], label = 'skeletal greedy CIM', color='red', marker="v")
+        matplotlib.pyplot.plot(plot_vector, [skeleton_result_matrix[i].count(1)/len(skeleton_result_matrix[i]) for i in range(len(skeleton_result_matrix))], label = 'skeleton', color = 'black', marker = '$s$')
     matplotlib.pyplot.legend(loc = 'upper right')
     matplotlib.pyplot.ylim(0,1)
     matplotlib.pyplot.xlim(0.5,7)
+    matplotlib.pyplot.xlabel("Expected neighborhood size")
+    matplotlib.pyplot.ylabel("Proportion of models recovered")
 
-    matplotlib.pyplot.savefig(dataset_path + "models_recovered_nodes-" + str(nodes) + "_sample-" + str(samples_no) + "_alpha-" + str(alpha) + ".pdf")
+    matplotlib.pyplot.savefig(dataset_path + "models_recovered_nodes-"+str(nodes)+"_sample-"+str(samples_no)+"_alpha-"+str(alpha)+".pdf")
     matplotlib.pyplot.show()
     
     # Plot proportion average number of steps taken
-    matplotlib.pyplot.title("Average number of steps taken: " + str(nodes)) 
     if alg_vector.count('gcim') > 0:
-        matplotlib.pyplot.plot(plot_vector, [sum(step_matrix_gcim[i])/len(step_matrix_gcim[i]) for i in range(len(step_matrix_gcim))], label = 'gcim_steps', color='magenta', marker="^")
+        matplotlib.pyplot.plot(plot_vector, [sum(step_matrix_gcim[i])/len(step_matrix_gcim[i]) for i in range(len(step_matrix_gcim))], label = 'greedy CIM', color='magenta', marker="^")
     if alg_vector.count('gcim_rec_phased_b') > 0:
         matplotlib.pyplot.plot(plot_vector, [sum(step_matrix_gcim_rec_phased_b[i])/len(step_matrix_gcim_rec_phased_b[i]) for i in range(len(step_matrix_gcim_rec_phased_b))], label = 'gcim_rec_phased_b', color='turquoise', marker="x")
     if alg_vector.count('ske') > 0:
-        matplotlib.pyplot.plot(plot_vector, [sum(step_matrix_ske[i])/len(step_matrix_ske[i]) for i in range(len(step_matrix_ske))], label = 'ske_steps', color='red',  marker="v")
+        matplotlib.pyplot.plot(plot_vector, [sum(step_matrix_ske[i])/len(step_matrix_ske[i]) for i in range(len(step_matrix_ske))], label = 'skeletal greedy CIM', color='red',  marker="v")
     matplotlib.pyplot.legend(loc = 'right')
     matplotlib.pyplot.xlim(0.5,7)
+    matplotlib.pyplot.xlabel("Expected neighborhood size")
+    matplotlib.pyplot.ylabel("Average number of steps")
     
     matplotlib.pyplot.savefig(dataset_path + "avg_no_steps_nodes-"+str(nodes)+".pdf")
     matplotlib.pyplot.show()
-
