@@ -1,0 +1,44 @@
+Number of nodes=8
+Number of samples=1000
+Cut of limit used=0.0001
+total_score_ges=-8105.075927471735
+total_score_pc=-8111.520288219354
+total_score_mmhc=-8105.075927471735
+total_score_greedySP=-8159.82407725914
+total_score_gis=-8105.075927471733
+total_score_gies=-8105.075927471735
+total_score_ske=-8105.075927471733
+total_score_true=-8105.075927471734
+shd dist ges to true=[0, 0]
+shd dist pc to true=[2, 0]
+shd dist mmhc to true=[0, 0]
+shd dist greedySP to true=[0, 2]
+shd dist gis to true=[0, 0]
+shd dist gies to true=[0, 0]
+shd dist ske to true=[0, 0]
+
+score_vector_ges=[-4194.956608930506, -3910.119318541228]
+
+score_vector_pc=[-4201.400969678127, -3910.1193185412276]
+
+score_vector_mmhc=[-4194.956608930506, -3910.119318541228]
+
+score_vector_greedySP=[-4194.956608930505, -3964.867468328634]
+
+score_vector_gis=[-4194.956608930505, -3910.1193185412276]
+
+score_vector_gies=[-4194.956608930506, -3910.119318541228]
+
+score_vector_ske=[-4194.956608930505, -3910.1193185412276]
+
+score_vector_true=[-4194.956608930506, -3910.1193185412276]
+step_vector_greedySP=[]
+
+step_vector_gis=[3, 7]
+
+step_vector_ske=[0, 1]
+
+skeleton_result_vector=[1, 1]
+
+return_dags_vector=[['ges', 'pc', 'mmhc', 'greedySP', 'gis', 'gies', 'ske', 'true'], [[(0, 5), (0, 7), (2, 6)], [(5, 0), (6, 2), (7, 0)], [(0, 5), (0, 7), (2, 6)], [(0, 5), (6, 2), (7, 0)], [(0, 5), (7, 0), (6, 2)], [(0, 5), (0, 7), (2, 6)], [(0, 5), (7, 0), (6, 2)], [(0, 5), (0, 7), (6, 2)]], [[(1, 4), (1, 5), (1, 6), (2, 3), (7, 6)], [(1, 4), (1, 5), (1, 6), (3, 2), (7, 6)], [(1, 4), (1, 5), (1, 6), (2, 3), (7, 6)], [(1, 4), (1, 5), (3, 2), (6, 1), (7, 6)], [(1, 4), (1, 5), (1, 6), (3, 2), (7, 6)], [(1, 4), (1, 5), (1, 6), (2, 3), (7, 6)], [(1, 4), (1, 5), (1, 6), (3, 2), (7, 6)], [(1, 4), (1, 5), (1, 6), (3, 2), (7, 6)]]]
+
