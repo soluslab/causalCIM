@@ -47,11 +47,11 @@ for e_idx in range(num_exp):
     idx = int(e_idx)
     # generate true dag and corresponding data
     true_tree, order, true_matrix, weights, samples = gen_samples(num_nodes, num_samples, seeds[e_idx])
-    # while true_tree.sum() == 0:
-    #     true_tree, order, matrix, weights, samples = gen_samples(num_nodes, num_samples)
     true_graphs[idx] = true_matrix[np.argsort(order)][:, np.argsort(order)]
-    np.savetxt("synth_data_CIMtree/samples_" + str(idx), samples)
-    np.savetxt("synth_data_CIMtree/dag_" + str(idx), true_matrix[np.argsort(order)][:, np.argsort(order)])
+    # To save the generated data and data-generating tree to text files uncomment the following two lines
+    # and create a directory in the working directory called "synth_data_CIMtree"
+    # np.savetxt("synth_data_CIMtree/samples_" + str(idx), samples)
+    # np.savetxt("synth_data_CIMtree/dag_" + str(idx), true_matrix[np.argsort(order)][:, np.argsort(order)])
 
     def acc(g):
         true_DAG = cdag.DAG.from_amat(true_matrix[np.argsort(order)][:, np.argsort(order)].astype(int))

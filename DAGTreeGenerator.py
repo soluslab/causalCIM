@@ -70,6 +70,9 @@ def gen_samples(num_nodes, num_samples, seed = 57):
     means = 0
     st_dvs = 1
     samples = rng.normal(means, st_dvs, (num_samples, num_nodes))
+    # print(samples[:, np.argsort(order)])
+    for feature, parents in zip(samples.T, weights):
+        feature += samples @ parents
     samples_perm = samples[:, np.argsort(order)]
     return edges, order, matrix, weights, samples_perm
 
@@ -101,7 +104,7 @@ def false_pos(g,h): # h is the true graph
 
 # # Example on six nodes with 10 samples. Changing the seed changes the graph and the samples.
 # # Default seed is the Grothendeick prime.
-# g = gen_samples(4,10,1312)
+# g = gen_samples(4,2,1312)
 # print(g[0])
 # print(g[1])
 # print(g[2])
