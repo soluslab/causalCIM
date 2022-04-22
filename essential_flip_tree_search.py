@@ -1,49 +1,8 @@
 #!/usr/bin/env python
-# coding: utf-8
+# coding: utf-8    
 
-
-# Import imset package 
-from imset import *
-
-# Score the neighbourhood of i in G. As 
-# the BIC decomposes we only have to score 
-# i\cup\pa_(i) and sum with \{c,i\} for c\in\ch(i)
-# INPUT: A score object, a graph, and a node
-# RETURNS: The score
-
-def local_score_BIC(input_BIC, input_node, input_parents, input_children):
-    internal_BIC_function = rbase.__dict__["$"](input_BIC, "local.score")
-#     graph_matrix = rpy2.robjects.r.matrix(numpy.transpose(numpy.array(list(input_graph.get_adjacency()))).flatten() , nrow=input_graph.vcount(), ncol=input_graph.vcount())
-    ret = []
-    for i in input_children:
-        ret.append(internal_BIC_function(i+1, input_node+1)[0])
-    ret.append(internal_BIC_function(input_node+1, rpy2.robjects.r.array(numpy.array([p+1 for p in input_parents])))[0])
-    return sum(ret)
-
-
-# Cannot remember why this code was written 
-# and I do not think it is being used
-
-def inner_node_order(input_graph):
-    order = node_order(input_graph)
-    order_copy = order.copy()
-    for i in order_copy:
-        if input_graph.degree(i) < 2:
-            order.remove(i)
-    return order
-
-def node_order(input_graph):
-    if not input_graph.is_connected(mode = 'weak'):
-        raise ValueError("node_order only implemented for connected graphs")
-    if not input_graph.is_tree(mode = 'all'):
-        raise ValueError("node_order is only defined for trees")
-    if input_graph.is_directed():
-        raise ValueError("node_order is only defined for undericted graphs")
-    return input_graph.bfs(0, mode='all')[0]
-        
-        
-    
-
+import igraph
+import ges
 
 
 # Given a subtree (as a list of vertices)
@@ -189,7 +148,6 @@ def delta_set(input_graph, input_subtree, check_input = True):
         paG = [i for i in input_graph.predecessors(node) if i in input_subtree]
         paH = [i for i in input_graph.successors(node) if i in input_subtree]
         pa = [i for i in input_graph.predecessors(node) if not i in input_subtree]
-#         print("node, paG, paH, pa"+str(node)+str(paG)+str(paH)+str(pa))
         if len(pa) > 0:
             if len(paG) + len(paH) > 0:
                 delta.append(node)
@@ -210,13 +168,34 @@ def delta_subtree(input_graph, input_subtree, check_input = True):
     delta = delta_set(input_graph, input_subtree, check_input = False)          
     return span(input_graph, delta)
 
-
+# This function should be renamed
+def essential_flip_search(input_skeleton, input_score):
+    if input_skeleton.is_directed():
+        ske = input_skeleton.copy()
+        ske.to_undirected()
+    else:
+        ske = input_skeleton.copy()
+    st = all_subtrees(ske)
+    gd = ske.copy()
+    gd.to_directed(mode = 'random')
+    max_score = input_score.full_score(gd.get_adjacency_sparse().toarray())
+    while True:
+        potential_moves = [reverse_subtree(g, i) for i in st if validate_essential_flip(g, i)]
+        scores = [input_score.full_score(t.get_adjacency_sparse().toarray()) for t in potential_moves]
+        ind = numpy.argmax(scores)
+        if scores[ind] > max_score:
+            gd = potential_moves[ind]
+            max_score = scores[ind]
+        else:
+            break 
+    return gd, max_score
 
 
 
 # Here is some test code
 
-
+import sempler
+import numpy as np
 
 # Give us a random tree
 g = igraph.Graph.Tree_Game(n = 8)
@@ -226,13 +205,32 @@ gd.to_directed(mode = 'random')
 # Print the tree
 print(gd)
 
+# Give us a random tree
+g = igraph.Graph.Tree_Game(n = 8)
 
-# Get all subtrees of g
-st = all_subtrees(g)
-# Get all valid essential flips for gd
-st_valid = [i for i in st if validate_essential_flip(gd, i)]
-# Print all edge-reversals giving us an essential flip
-print([i for i in st_valid if len(i) == 2])
+# Randomly direct this tree
+gd = g.copy()
+gd.to_directed(mode = 'random')
+
+# Print the tree
+print(gd)
+
+# Generate observational data from a Gaussian SCM using sempler
+# See documentation for the 'ges' package for source.
+A = gd.get_adjacency_sparse().toarray()
+W = A * np.random.uniform(1, 2, A.shape) # sample weights
+data = sempler.LGANM(W,(1,2), (1,2)).sample(n=5000)
+
+# Run GES with the Gaussian BIC score
+estimate, score = ges.fit_bic(data, A0 = g.get_adjacency_sparse().toarray(), phases = ['turning'])
+
+print(estimate)
+
+# Tun esential_flip_search with the same BIC score
+bic = ges.scores.GaussObsL0Pen(data)
+essential_flip_estimate, essential_flip_score = essential_flip_search(g, bic)
+print(essential_flip_estimate)
+
 
 
 
