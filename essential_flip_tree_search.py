@@ -210,14 +210,6 @@ import numpy as np
 
 # Give us a random tree
 g = igraph.Graph.Tree_Game(n = 8)
-# Randomly direct this tree
-gd = g.copy()
-gd.to_directed(mode = 'random')
-# Print the tree
-print(gd)
-
-# Give us a random tree
-g = igraph.Graph.Tree_Game(n = 8)
 
 # Randomly direct this tree
 gd = g.copy()
