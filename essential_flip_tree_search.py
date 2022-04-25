@@ -203,7 +203,6 @@ def essential_flip_search(input_skeleton, input_score):
     return gd, max_score
 
 
-
 # # Here is some test code
 #
 # import sempler
