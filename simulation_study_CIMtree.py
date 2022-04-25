@@ -18,6 +18,7 @@ from conditional_independence import (
     partial_correlation_suffstat,
     partial_correlation_test,
 )
+import essential_flip_tree_search
 
 # Set number of desired experiments, nodes for tree and samples to be drawn.
 num_exp = 10
@@ -36,12 +37,15 @@ num_sources = np.empty(num_exp, int)
 gues_acc = np.empty(num_exp, float)
 ges_acc = np.empty(num_exp, float)
 gsp_acc = np.empty(num_exp, float)
+eft_acc = np.empty(num_exp, float)
 ges_roc = np.empty([num_exp, 2], float)
 gsp_roc = np.empty([num_exp, 2], float)
+eft_roc = np.empty([num_exp, 2], float)
 true_graphs = np.empty((num_exp, num_nodes, num_nodes), bool)
 gues_graphs = np.empty((num_exp, num_nodes, num_nodes), bool)
 ges_graphs = np.empty((num_exp, num_nodes, num_nodes), bool)
 gsp_graphs = np.empty((num_exp, num_nodes, num_nodes), bool)
+eft_graphs = np.empty((num_exp, num_nodes, num_nodes), bool)
 
 for e_idx in range(num_exp):
     idx = int(e_idx)
@@ -82,14 +86,27 @@ for e_idx in range(num_exp):
     gsp_roc[idx][0], gsp_roc[idx][1] = roc(gsp_cpdag.astype(bool))
     gsp_graphs[idx] = nx.to_numpy_array(gsp_graph.to_nx())
 
+    #EFTSearch with true skeleton given as background knowledge
+    skel = to_igraph(true_tree, num_nodes)
+    bic = ges.scores.GaussObsL0Pen(samples)
+    eft_graph, eft_score = essential_flip_search(skel, bic)
+    eft_adj = eft_graph.as_adjacency_matrix()
+    eft_cpdag = eft_adj.dag_to_cpdag().astype(bool)
+    eft_acc[idx] = acc(eft_cpdag)
+    eft_roc[idx][0], eft_roc[idx][1] = roc(eft_cpdag)
+    eft_graphs[idx] = eft_adj
+
     np.savez(
         "results.npz",
         ges_acc=ges_acc,
         gsp_acc=gsp_acc,
+        eft_acc=eft_acc,
         ges_roc=ges_roc,
         gsp_roc=gsp_roc,
+        eft_roc=eft_roc,
         gsp_graphs=gsp_graphs,
         ges_graphs=ges_graphs,
+        eft_graphs=eft_graphs,
         true_graphs=true_graphs,
     )
 
@@ -100,6 +117,9 @@ print(results['ges_acc'])
 
 print(results['gsp_roc'])
 print(results['gsp_acc'])
+
+print(results['eft_roc'])
+print(results['eft_acc'])
 
 
 
