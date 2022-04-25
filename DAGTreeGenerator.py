@@ -65,14 +65,14 @@ def gen_samples(num_nodes, num_samples, seed = 57):
     matrix = np.zeros((num_nodes, num_nodes), bool)
     edge_mask = [[order.index(e[0]), order.index(e[1])] for e in edges]
     for em in edge_mask:
-        matrix[em[1]][em[0]] = True
+        matrix[em[0]][em[1]] = True
     weights = np.zeros_like(matrix, float)
     weights[matrix] = rng.random(len(edges)) * 2 - 1
     means = 0
     st_dvs = 1
     samples = rng.normal(means, st_dvs, (num_samples, num_nodes))
     # print(samples[:, np.argsort(order)])
-    for feature, parents in zip(samples.T, weights):
+    for feature, parents in zip(samples.T, weights.T):
         feature += samples @ parents
     samples_perm = samples[:, np.argsort(order)]
     return edges, order, matrix, weights, samples_perm

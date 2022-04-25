@@ -24,9 +24,9 @@ from essential_flip_tree_search import (
 )
 
 # Set number of desired experiments, nodes for tree and samples to be drawn.
-num_exp = 100
-num_nodes = 10
-num_samples = 100000
+num_exp = 10
+num_nodes = 8
+num_samples = 10000
 
 # Set seed for generating a collection of seeds for gen_samples equal to the number of experiments.
 # Seeds are drawn from a range dependent on the number of experiments.
@@ -45,6 +45,9 @@ ges_roc = np.empty([num_exp, 2], float)
 gsp_roc = np.empty([num_exp, 2], float)
 eft_roc = np.empty([num_exp, 2], float)
 true_graphs = np.empty((num_exp, num_nodes, num_nodes), bool)
+true_CPDAGs = np.empty((num_exp, num_nodes, num_nodes), bool)
+true_trees = [0 for i in range(num_exp)]
+# true_mats = [0 for i in range(num_exp)]
 gues_graphs = np.empty((num_exp, num_nodes, num_nodes), bool)
 ges_graphs = np.empty((num_exp, num_nodes, num_nodes), bool)
 gsp_graphs = np.empty((num_exp, num_nodes, num_nodes), bool)
@@ -55,16 +58,21 @@ for e_idx in range(num_exp):
     # generate true dag and corresponding data
     true_tree, order, true_matrix, weights, samples = gen_samples(num_nodes, num_samples, seeds[e_idx])
     true_graphs[idx] = true_matrix[np.argsort(order)][:, np.argsort(order)]
+    true_trees[idx] = true_tree
+    # true_mats[idx] = true_matrix
     # To save the generated data and data-generating tree to text files uncomment the following two lines
     # and create a directory in the working directory called "synth_data_CIMtree"
-    # np.savetxt("synth_data_CIMtree/samples_" + str(idx), samples)
-    # np.savetxt("synth_data_CIMtree/dag_" + str(idx), true_matrix[np.argsort(order)][:, np.argsort(order)])
+    np.savetxt("synth_data_CIMtree/samples_" + str(idx), samples)
+    np.savetxt("synth_data_CIMtree/dag_" + str(idx), true_matrix[np.argsort(order)][:, np.argsort(order)])
+
+    # True CPDAG
+    true_DAG = cdag.DAG.from_amat(true_matrix[np.argsort(order)][:, np.argsort(order)].astype(int))
+    true_CP = true_DAG.cpdag()
+    true_cpdag = true_CP.to_amat()[0].astype(bool)
+    true_CPDAGs[idx] = true_cpdag
 
     # Get structural hamming distance between learned and true graph
     def acc(g):
-        true_DAG = cdag.DAG.from_amat(true_matrix[np.argsort(order)][:, np.argsort(order)].astype(int))
-        true_CP = true_DAG.cpdag()
-        true_cpdag = true_CP.to_amat()[0].astype(bool)
         return struct_hamming_sim(g, true_cpdag)
 
     # Get true positives and false positives in CPDAG of learned matrix
@@ -76,7 +84,8 @@ for e_idx in range(num_exp):
 
     # GES result, accuracy and true/false positives
     skel = to_igraph(true_tree, num_nodes)
-    ges_graph, score = ges.fit_bic(samples, A0 = skel.get_adjacency_sparse().toarray(), phases = ['turning'])
+    # ges_graph, score = ges.fit_bic(samples, A0 = skel.get_adjacency_sparse().toarray(), phases = ['turning'])
+    ges_graph, score = ges.fit_bic(samples)
     ges_acc[idx] = acc(ges_graph.astype(bool))
     ges_roc[idx][0], ges_roc[idx][1] = roc(ges_graph.astype(bool))
     ges_graphs[idx] = ges_graph
@@ -99,10 +108,10 @@ for e_idx in range(num_exp):
     eft_cpdag = eft_cd_dag.cpdag().to_amat()[0].astype(bool) #ges.dag_to_cpdag(eft_adj).astype(bool)
     eft_acc[idx] = acc(eft_cpdag)
     eft_roc[idx][0], eft_roc[idx][1] = roc(eft_cpdag)
-    eft_graphs[idx] = eft_adj
+    eft_graphs[idx] = eft_cpdag
 
     np.savez(
-        "results3.npz",
+        "results5.npz",
         ges_acc=ges_acc,
         gsp_acc=gsp_acc,
         eft_acc=eft_acc,
@@ -113,6 +122,9 @@ for e_idx in range(num_exp):
         ges_graphs=ges_graphs,
         eft_graphs=eft_graphs,
         true_graphs=true_graphs,
+        true_CPDAGs=true_CPDAGs,
+        true_trees=true_trees,
+        # true_mats=true_mats
     )
 
 # # Example of how to view the results
