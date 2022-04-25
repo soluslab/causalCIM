@@ -53,25 +53,27 @@ for e_idx in range(num_exp):
     # np.savetxt("synth_data_CIMtree/samples_" + str(idx), samples)
     # np.savetxt("synth_data_CIMtree/dag_" + str(idx), true_matrix[np.argsort(order)][:, np.argsort(order)])
 
+    # Get structural hamming distance between learned and true graph
     def acc(g):
         true_DAG = cdag.DAG.from_amat(true_matrix[np.argsort(order)][:, np.argsort(order)].astype(int))
         true_CP = true_DAG.cpdag()
         true_cpdag = true_CP.to_amat()[0].astype(bool)
         return struct_hamming_sim(g, true_cpdag)
 
+    # Get true positives and false positives in CPDAG of learned matrix
     def roc(g):
         true_DAG = cdag.DAG.from_amat(true_matrix[np.argsort(order)][:, np.argsort(order)].astype(int))
         true_CP = true_DAG.cpdag()
         true_cpdag = true_CP.to_amat()[0].astype(bool)
         return true_pos(g, true_cpdag), false_pos(g, true_cpdag)
 
-    # GES result and accuracy
+    # GES result, accuracy and true/false positives
     ges_graph, score = ges.fit_bic(samples)
     ges_acc[idx] = acc(ges_graph.astype(bool))
     ges_roc[idx][0], ges_roc[idx][1] = roc(ges_graph.astype(bool))
     ges_graphs[idx] = ges_graph
 
-    #GreedySP result and accuracy
+    #GreedySP result, accuracy and true/false positives
     suffstat = cdag.partial_correlation_suffstat(samples)
     ci_tester = MemoizedCI_Tester(partial_correlation_test, suffstat, alpha=0.05)
     gsp_graph = cdag.gsp(set(range(num_nodes)), ci_tester)
@@ -91,10 +93,13 @@ for e_idx in range(num_exp):
         true_graphs=true_graphs,
     )
 
-# print(gsp_graphs)
-# print(true_graphs)
-# print(ges_acc)
-# print(gsp_acc)
+# Example of how to view the results
+results = np.load('results.npz')
+print(results['ges_roc'])
+print(results['ges_acc'])
+
+print(results['gsp_roc'])
+print(results['gsp_acc'])
 
 
 
