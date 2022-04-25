@@ -168,6 +168,17 @@ def delta_subtree(input_graph, input_subtree, check_input = True):
     delta = delta_set(input_graph, input_subtree, check_input = False)          
     return span(input_graph, delta)
 
+def reverse_subtree(input_graph, input_subtree, check_input = True):
+    if check_input:
+        if not is_subtree(input_graph, input_subtree):
+            raise ValueError("reverse_subtree only implemented if given a complete subtree")
+    return_graph = input_graph.copy()
+    for edge in input_graph.get_edgelist():
+        if edge[0] in input_subtree and edge[1] in input_subtree:
+            return_graph.delete_edges([edge])
+            return_graph.add_edges([(edge[1], edge[0])])
+    return return_graph
+
 # This function should be renamed
 def essential_flip_search(input_skeleton, input_score):
     if input_skeleton.is_directed():
