@@ -4,7 +4,8 @@ from DAGTreeGenerator import (
     gen_samples,
     struct_hamming_sim,
     true_pos,
-    false_pos
+    false_pos,
+    to_igraph
 )
 import numpy as np
 import random
@@ -18,12 +19,14 @@ from conditional_independence import (
     partial_correlation_suffstat,
     partial_correlation_test,
 )
-import essential_flip_tree_search
+from essential_flip_tree_search import (
+    essential_flip_search
+)
 
 # Set number of desired experiments, nodes for tree and samples to be drawn.
-num_exp = 10
-num_nodes = 5
-num_samples = 10000
+num_exp = 100
+num_nodes = 10
+num_samples = 100000
 
 # Set seed for generating a collection of seeds for gen_samples equal to the number of experiments.
 # Seeds are drawn from a range dependent on the number of experiments.
@@ -72,7 +75,8 @@ for e_idx in range(num_exp):
         return true_pos(g, true_cpdag), false_pos(g, true_cpdag)
 
     # GES result, accuracy and true/false positives
-    ges_graph, score = ges.fit_bic(samples)
+    skel = to_igraph(true_tree, num_nodes)
+    ges_graph, score = ges.fit_bic(samples, A0 = skel.get_adjacency_sparse().toarray(), phases = ['turning'])
     ges_acc[idx] = acc(ges_graph.astype(bool))
     ges_roc[idx][0], ges_roc[idx][1] = roc(ges_graph.astype(bool))
     ges_graphs[idx] = ges_graph
@@ -87,17 +91,18 @@ for e_idx in range(num_exp):
     gsp_graphs[idx] = nx.to_numpy_array(gsp_graph.to_nx())
 
     #EFTSearch with true skeleton given as background knowledge
-    skel = to_igraph(true_tree, num_nodes)
+    # skel = to_igraph(true_tree, num_nodes)
     bic = ges.scores.GaussObsL0Pen(samples)
     eft_graph, eft_score = essential_flip_search(skel, bic)
-    eft_adj = eft_graph.as_adjacency_matrix()
-    eft_cpdag = eft_adj.dag_to_cpdag().astype(bool)
+    eft_adj = eft_graph.get_adjacency()
+    eft_cd_dag = cdag.DAG.from_amat(eft_adj)
+    eft_cpdag = eft_cd_dag.cpdag().to_amat()[0].astype(bool) #ges.dag_to_cpdag(eft_adj).astype(bool)
     eft_acc[idx] = acc(eft_cpdag)
     eft_roc[idx][0], eft_roc[idx][1] = roc(eft_cpdag)
     eft_graphs[idx] = eft_adj
 
     np.savez(
-        "results.npz",
+        "results3.npz",
         ges_acc=ges_acc,
         gsp_acc=gsp_acc,
         eft_acc=eft_acc,
@@ -110,16 +115,16 @@ for e_idx in range(num_exp):
         true_graphs=true_graphs,
     )
 
-# Example of how to view the results
-results = np.load('results.npz')
-print(results['ges_roc'])
-print(results['ges_acc'])
-
-print(results['gsp_roc'])
-print(results['gsp_acc'])
-
-print(results['eft_roc'])
-print(results['eft_acc'])
+# # Example of how to view the results
+# results = np.load('results.npz')
+# print(results['ges_roc'])
+# print(results['ges_acc'])
+#
+# print(results['gsp_roc'])
+# print(results['gsp_acc'])
+#
+# print(results['eft_roc'])
+# print(results['eft_acc'])
 
 
 

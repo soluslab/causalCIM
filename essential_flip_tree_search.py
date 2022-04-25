@@ -3,6 +3,7 @@
 
 import igraph
 import ges
+import numpy as np
 
 
 # Given a subtree (as a list of vertices)
@@ -191,9 +192,9 @@ def essential_flip_search(input_skeleton, input_score):
     gd.to_directed(mode = 'random')
     max_score = input_score.full_score(gd.get_adjacency_sparse().toarray())
     while True:
-        potential_moves = [reverse_subtree(g, i) for i in st if validate_essential_flip(g, i)]
+        potential_moves = [reverse_subtree(gd, i) for i in st if validate_essential_flip(gd, i)]
         scores = [input_score.full_score(t.get_adjacency_sparse().toarray()) for t in potential_moves]
-        ind = numpy.argmax(scores)
+        ind = np.argmax(scores)
         if scores[ind] > max_score:
             gd = potential_moves[ind]
             max_score = scores[ind]
@@ -203,44 +204,44 @@ def essential_flip_search(input_skeleton, input_score):
 
 
 
-# Here is some test code
-
-import sempler
-import numpy as np
-
-# Give us a random tree
-g = igraph.Graph.Tree_Game(n = 8)
-# Randomly direct this tree
-gd = g.copy()
-gd.to_directed(mode = 'random')
-# Print the tree
-print(gd)
-
-# Give us a random tree
-g = igraph.Graph.Tree_Game(n = 8)
-
-# Randomly direct this tree
-gd = g.copy()
-gd.to_directed(mode = 'random')
-
-# Print the tree
-print(gd)
-
-# Generate observational data from a Gaussian SCM using sempler
-# See documentation for the 'ges' package for source.
-A = gd.get_adjacency_sparse().toarray()
-W = A * np.random.uniform(1, 2, A.shape) # sample weights
-data = sempler.LGANM(W,(1,2), (1,2)).sample(n=5000)
-
-# Run GES with the Gaussian BIC score
-estimate, score = ges.fit_bic(data, A0 = g.get_adjacency_sparse().toarray(), phases = ['turning'])
-
-print(estimate)
-
-# Tun esential_flip_search with the same BIC score
-bic = ges.scores.GaussObsL0Pen(data)
-essential_flip_estimate, essential_flip_score = essential_flip_search(g, bic)
-print(essential_flip_estimate)
+# # Here is some test code
+#
+# import sempler
+# import numpy as np
+#
+# # Give us a random tree
+# g = igraph.Graph.Tree_Game(n = 8)
+# # Randomly direct this tree
+# gd = g.copy()
+# gd.to_directed(mode = 'random')
+# # Print the tree
+# print(gd)
+#
+# # Give us a random tree
+# g = igraph.Graph.Tree_Game(n = 8)
+#
+# # Randomly direct this tree
+# gd = g.copy()
+# gd.to_directed(mode = 'random')
+#
+# # Print the tree
+# print(gd)
+#
+# # Generate observational data from a Gaussian SCM using sempler
+# # See documentation for the 'ges' package for source.
+# A = gd.get_adjacency_sparse().toarray()
+# W = A * np.random.uniform(1, 2, A.shape) # sample weights
+# data = sempler.LGANM(W,(1,2), (1,2)).sample(n=5000)
+#
+# # Run GES with the Gaussian BIC score
+# estimate, score = ges.fit_bic(data, A0 = g.get_adjacency_sparse().toarray(), phases = ['turning'])
+#
+# print(estimate)
+#
+# # Run esential_flip_search with the same BIC score
+# bic = ges.scores.GaussObsL0Pen(data)
+# essential_flip_estimate, essential_flip_score = essential_flip_search(g, bic)
+# print(essential_flip_estimate)
 
 
 

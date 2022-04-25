@@ -110,13 +110,17 @@ def to_igraph(g, n): # g is a tree given as a list of edges and n is the number 
     ig.add_edges(tuple_edges)
     return ig
 
-# Example on six nodes with 10 samples. Changing the seed changes the graph and the samples.
-# Default seed is the Grothendeick prime.
-g = gen_samples(4,2,1312)
-print(g[0])
-print(g[1])
-print(g[2])
-print(g[3])
-print(g[4])
-print(to_igraph(g[0],4))
+# # Example on six nodes with 10 samples. Changing the seed changes the graph and the samples.
+# # Default seed is the Grothendeick prime.
+# g = gen_samples(4,2,1312)
+# print(g[0])
+# print(g[1])
+# print(g[2])
+# print(g[3])
+# print(g[4])
+# print(to_igraph(g[0],4))
+#
+# h = to_igraph(g[0], 4)
+# a = h.get_adjacency()
+# print(a)
 
