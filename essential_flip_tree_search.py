@@ -4,6 +4,9 @@
 import igraph
 import ges
 import numpy as np
+import networkx as nx
+from networkx.algorithms import tree
+
 
 
 # Given a subtree (as a list of vertices)
@@ -189,7 +192,7 @@ def essential_flip_search(input_skeleton, input_score):
         ske = input_skeleton.copy()
     st = all_subtrees(ske)
     gd = ske.copy()
-    gd.to_directed(mode = 'random')
+    gd.to_directed(mode='random')
     max_score = input_score.full_score(gd.get_adjacency_sparse().toarray())
     while True:
         potential_moves = [reverse_subtree(gd, i) for i in st if validate_essential_flip(gd, i)]
@@ -202,6 +205,59 @@ def essential_flip_search(input_skeleton, input_score):
             break 
     return gd, max_score
 
+# Convert a graph given as a list of edges to an igraph object
+def to_igraph(g, n): # g is a tree given as a list of edges and n is the number of vertices
+    tuple_edges = [tuple(e) for e in g]
+    ig = igraph.Graph()
+    ig.add_vertices(range(n))
+    ig.add_edges(tuple_edges)
+    return ig
+
+# Learning a tree skeleton from data:
+# Function for conditional expectations
+def phi_func(node1, node2, data, x):
+    # x a realization of node1
+    vals = data[data[:,node1] == x][:, node2].mean()
+    return(vals)
+
+# Function for computing edge weights from data:
+def emp_edge_weight(node1, node2, data):
+    df_nodes = data[:, [node1, node2]]
+    n_rows = df_nodes.shape[0]
+    devs = np.array([df_nodes[i, 1] - phi_func(node1, node2, data, df_nodes[i, 0]) for i in range(n_rows)])
+    var = devs.var()
+    var_node2 = data[:, node2].var()
+    return(((1/2)*np.log(var/var_node2)))
+
+# Function for producing minimum weight spanning tree. Valid methods are 'kruskal, 'prim', or 'boruvka'.
+# Default method is 'kruskal'.
+def min_weight_tree(data, method='kruskal'):
+    edge_weights = np.empty((11, 11), float)
+    n = data.shape[1]
+    for node1 in range(n):
+        for node2 in range(n):
+            if node1 == node2:
+                continue
+            edge_weights[node1, node2] = emp_edge_weight(node1, node2, data)
+    G_data = nx.MultiGraph()
+    for node1 in range(n):
+        for node2 in range(n):
+            if node1 == node2:
+                continue
+            G_data.add_edge(node1, node2, weight=edge_weights[node1, node2])
+    min_weight_tree_data = tree.minimum_spanning_edges(G_data, algorithm=method, data=False)
+    min_weight_tree_edge_list = [list(e[:-1]) for e in min_weight_tree_data]
+    ig_min_weight_tree = to_igraph(min_weight_tree_edge_list, n)
+    return(ig_min_weight_tree)
+
+# EFT causal discovery algorithm
+def eft(data, skeleton = "none"):
+    bic = ges.scores.GaussObsL0Pen(data)
+    if skeleton == "none":
+        learned_tree, learned_score = essential_flip_search(min_weight_tree(data), bic)
+    else:
+        learned_tree, learned_score = essential_flip_search(skeleton, bic)
+    return learned_tree, learned_score
 
 # # Here is some test code
 #
@@ -209,7 +265,7 @@ def essential_flip_search(input_skeleton, input_score):
 # import numpy as np
 #
 # # Give us a random tree
-# g = igraph.Graph.Tree_Game(n = 8)
+# g = igraph.Graph.Tree_Game(n = 4)
 # # Randomly direct this tree
 # gd = g.copy()
 # gd.to_directed(mode = 'random')
@@ -217,7 +273,7 @@ def essential_flip_search(input_skeleton, input_score):
 # print(gd)
 #
 # # Give us a random tree
-# g = igraph.Graph.Tree_Game(n = 8)
+# g = igraph.Graph.Tree_Game(n = 4)
 #
 # # Randomly direct this tree
 # gd = g.copy()
@@ -238,10 +294,12 @@ def essential_flip_search(input_skeleton, input_score):
 # print(estimate)
 #
 # # Run esential_flip_search with the same BIC score
-# bic = ges.scores.GaussObsL0Pen(data)
-# essential_flip_estimate, essential_flip_score = essential_flip_search(g, bic)
+# # bic = ges.scores.GaussObsL0Pen(data)
+# # essential_flip_estimate, essential_flip_score = essential_flip_search(g, bic)
+# essential_flip_estimate, essential_flip_score = eft(data, g)
+# est_wo_skel, score_wo_skel = eft(data)
 # print(essential_flip_estimate)
-
+# print(est_wo_skel)
 
 
 
