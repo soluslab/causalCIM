@@ -21,6 +21,7 @@ from essential_flip_tree_search import (
     essential_flip_search,
     eft
 )
+from RP_algorithm import rp
 
 # Import Sachs observational data
 df = pd.read_csv('sachs_obs_data.csv', delimiter = ',')
@@ -57,17 +58,20 @@ ges_w_skel_acc = np.empty(1, float)
 ges_wo_skel_acc = np.empty(1, float)
 gsp_wo_skel_acc = np.empty(1, float)
 eft_w_skel_acc = np.empty(1, float)
-eft_wo_skel_acc = np.empty(1, float)
+eft_wo_skel_acc = np.empty([1, 10], float)
+rp_wo_skel_acc = np.empty([1, 10], float)
 ges_w_skel_roc = np.empty([1, 2], float)
 ges_wo_skel_roc = np.empty([1, 2], float)
 gsp_wo_skel_roc = np.empty([1, 2], float)
 eft_w_skel_roc = np.empty([1, 2], float)
-eft_wo_skel_roc = np.empty([1, 2], float)
+eft_wo_skel_roc = np.empty([10, 2], float)
+rp_wo_skel_roc = np.empty([10, 2], float)
 ges_w_skel_graph = np.empty((1, 11, 11), bool)
 ges_wo_skel_graph = np.empty((1, 11, 11), bool)
 gsp_wo_skel_graph = np.empty((1, 11, 11), bool)
 eft_w_skel_graph = np.empty((1, 11, 11), bool)
-eft_wo_skel_graph = np.empty((1, 11, 11), bool)
+eft_wo_skel_graph = np.empty((10, 11, 11), bool)
+rp_wo_skel_graph = np.empty((10, 11, 11), bool)
 
 # Run EFT with skeleton of "true graph" given as background knowledge
 true_skel_edges = [
@@ -126,14 +130,45 @@ ges_w_skel_roc[0][1] = false_pos(ges_graph.astype(bool), true_cpdag)
 ges_w_skel_graph[0] = ges_graph
 
 # Run EFT without skeleton as background knowledge
-eft_graph, eft_score = eft(sachs_samples)
-eft_adj = eft_graph.get_adjacency()
-eft_cd_dag = cdag.DAG.from_amat(eft_adj)
-eft_cpdag = eft_cd_dag.cpdag().to_amat()[0].astype(bool)
-eft_wo_skel_acc[0] = struct_hamming_sim(eft_cpdag, true_cpdag)
-eft_wo_skel_roc[0][0] = true_pos(eft_cpdag, true_cpdag)
-eft_wo_skel_roc[0][1] = false_pos(eft_cpdag, true_cpdag)
-eft_wo_skel_graph[0] = eft_cpdag
+# eft_graph, eft_score = eft(sachs_samples)
+# eft_adj = eft_graph.get_adjacency()
+# eft_cd_dag = cdag.DAG.from_amat(eft_adj)
+# eft_cpdag = eft_cd_dag.cpdag().to_amat()[0].astype(bool)
+# eft_wo_skel_acc[0] = struct_hamming_sim(eft_cpdag, true_cpdag)
+# eft_wo_skel_roc[0][0] = true_pos(eft_cpdag, true_cpdag)
+# eft_wo_skel_roc[0][1] = false_pos(eft_cpdag, true_cpdag)
+# eft_wo_skel_graph[0] = eft_cpdag
+
+for e_idx in range(10):
+    idx = int(e_idx)
+    num_bins = 5*(idx + 1)
+    eft_graph, eft_score = eft(sachs_samples, bins=num_bins)
+    eft_adj = eft_graph.get_adjacency()
+    eft_cd_dag = cdag.DAG.from_amat(eft_adj)
+    eft_cpdag = eft_cd_dag.cpdag().to_amat()[0].astype(bool)
+    eft_wo_skel_acc[0][idx] = struct_hamming_sim(eft_cpdag, true_cpdag)
+    eft_wo_skel_roc[idx][0] = true_pos(eft_cpdag, true_cpdag)
+    eft_wo_skel_roc[idx][1] = false_pos(eft_cpdag, true_cpdag)
+    eft_wo_skel_graph[idx] = eft_cpdag
+
+
+# Run RP-algorithm without skeleton as background knowledge
+# rp_wo_skel_adj = rp(sachs_samples)
+# rp_wo_skel_cpdag = rp_wo_skel_adj.astype(bool)
+# rp_wo_skel_acc[0] = struct_hamming_sim(rp_wo_skel_cpdag, true_cpdag)
+# rp_wo_skel_roc[0][0] = true_pos(rp_wo_skel_cpdag, true_cpdag)
+# rp_wo_skel_roc[0][1] = false_pos(rp_wo_skel_cpdag, true_cpdag)
+# rp_wo_skel_graph[0] = rp_wo_skel_cpdag
+
+for e_idx in range(10):
+    idx = int(e_idx)
+    num_bins = 5*(idx + 1)
+    rp_wo_skel_adj = rp(sachs_samples, bins=num_bins)
+    rp_wo_skel_cpdag = rp_wo_skel_adj.astype(bool)
+    rp_wo_skel_acc[0][idx] = struct_hamming_sim(rp_wo_skel_cpdag, true_cpdag)
+    rp_wo_skel_roc[idx][0] = true_pos(rp_wo_skel_cpdag, true_cpdag)
+    rp_wo_skel_roc[idx][1] = false_pos(rp_wo_skel_cpdag, true_cpdag)
+    rp_wo_skel_graph[idx] = rp_wo_skel_cpdag
 
 # Run GES without skeleton of true graph given as background knowledge
 ges_graph, score = ges.fit_bic(sachs_samples, phases = ['forward', 'turning', 'backward'])
@@ -154,20 +189,23 @@ gsp_wo_skel_graph[0] = gsp_cpdag
 
 
 np.savez(
-    "sachs_results.npz",
+    "sachs_results_MI.npz",
     ges_w_skel_acc=ges_w_skel_acc,
     ges_wo_skel_acc=ges_wo_skel_acc,
     gsp_wo_skel_acc=gsp_wo_skel_acc,
     eft_w_skel_acc=eft_w_skel_acc,
     eft_wo_skel_acc=eft_wo_skel_acc,
+    rp_wo_skel_acc=rp_wo_skel_acc,
     ges_w_skel_roc=ges_w_skel_roc,
     ges_wo_skel_roc=ges_wo_skel_roc,
     gsp_wo_skel_roc=gsp_wo_skel_roc,
     eft_w_skel_roc=eft_w_skel_roc,
     eft_wo_skel_roc=eft_wo_skel_roc,
+    rp_wo_skel_roc=rp_wo_skel_roc,
     ges_w_skel_graph=ges_w_skel_graph,
     ges_wo_skel_graph=ges_wo_skel_graph,
     gsp_wo_skel_graph=gsp_wo_skel_graph,
     eft_w_skel_graph=eft_w_skel_graph,
-    eft_wo_skel_graph=eft_wo_skel_graph
+    eft_wo_skel_graph=eft_wo_skel_graph,
+    rp_wo_skel_graph=rp_wo_skel_graph
     )

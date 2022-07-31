@@ -33,9 +33,9 @@ def MI_MWST(data, bins=5, method='kruskal'):
     return ig_min_weight_tree, edge_weights, min_weight_tree_edge_list
 
 # RP-algorithm.  Outputs adjacency matrix of learned CPDAG of the polytree.
-def rp(data, alpha=0.05):
+def rp(data, alpha=0.05, bins=5):
     n = data.shape[1]
-    learned_tree, weights, edges = MI_MWST(data)
+    learned_tree, weights, edges = MI_MWST(data, bins=bins)
     sorted_edges = sorted(sorted(e) for e in edges)
     rp_adj_mat = np.zeros([n, n], int)
     for e in sorted_edges:

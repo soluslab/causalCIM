@@ -269,11 +269,11 @@ def min_weight_tree(data, method='kruskal'):
     return(ig_min_weight_tree)
 
 # EFT causal discovery algorithm
-def eft(data, skeleton = "none"):
+def eft(data, skeleton = "none", bins = 5):
     bic = ges.scores.GaussObsL0Pen(data)
     if skeleton == "none":
         # learned_tree, learned_score = essential_flip_search(min_weight_tree(data), bic)
-        learned_tree, learned_score = essential_flip_search(MI_MWST(data), bic)
+        learned_tree, learned_score = essential_flip_search(MI_MWST(data, bins), bic)
     else:
         learned_tree, learned_score = essential_flip_search(skeleton, bic)
     return learned_tree, learned_score
