@@ -7,6 +7,7 @@ from DAGTreeGenerator import (
     false_pos,
     to_igraph
 )
+from RP_algorithm import rp
 import numpy as np
 import random
 from numpy.random import default_rng, randint
@@ -52,12 +53,15 @@ eft_graphs = np.empty((num_exp, num_nodes, num_nodes), bool)
 
 ges_wo_skel_acc = np.empty(num_exp, float)
 gsp_wo_skel_acc = np.empty(num_exp, float)
+rp_wo_skel_acc = np.empty(num_exp, float)
 eft_wo_skel_acc = np.empty(num_exp, float)
 ges_wo_skel_roc = np.empty([num_exp, 2], float)
 gsp_wo_skel_roc = np.empty([num_exp, 2], float)
+rp_wo_skel_roc = np.empty([num_exp, 2], float)
 eft_wo_skel_roc = np.empty([num_exp, 2], float)
 ges_wo_skel_graphs = np.empty((num_exp, num_nodes, num_nodes), bool)
 gsp_wo_skel_graphs = np.empty((num_exp, num_nodes, num_nodes), bool)
+rp_wo_skel_graphs = np.empty((num_exp, num_nodes, num_nodes), bool)
 eft_wo_skel_graphs = np.empty((num_exp, num_nodes, num_nodes), bool)
 
 # Experiments
@@ -139,6 +143,13 @@ for e_idx in range(num_exp):
     gsp_wo_skel_roc[idx][0], gsp_wo_skel_roc[idx][1] = roc(gsp_wo_skel_cpdag.astype(bool))
     gsp_wo_skel_graphs[idx] = nx.to_numpy_array(gsp_wo_skel_graph.to_nx())
 
+    # RP-algorithm without true skeleton given as background knowledge
+    rp_wo_skel_adj = rp(samples)
+    rp_wo_skel_cpdag = rp_wo_skel_adj.astype(bool)
+    rp_wo_skel_acc[idx] = acc(rp_wo_skel_cpdag)
+    rp_wo_skel_roc[idx][0], rp_wo_skel_roc[idx][1] = roc(rp_wo_skel_cpdag)
+    rp_wo_skel_graphs[idx] = rp_wo_skel_cpdag
+
     # EFTSearch without true skeleton given as background knowledge
     # bic = ges.scores.GaussObsL0Pen(samples)
     eft_wo_skel_graph, eft_wo_skel_score = eft(samples)
@@ -162,12 +173,15 @@ for e_idx in range(num_exp):
         eft_graphs=eft_graphs,
         ges_wo_skel_acc=ges_wo_skel_acc,
         gsp_wo_skel_acc=gsp_wo_skel_acc,
+        rp_wo_skel_acc=rp_wo_skel_acc,
         eft_wo_skel_acc=eft_wo_skel_acc,
         ges_wo_skel_roc=ges_wo_skel_roc,
         gsp_wo_skel_roc=gsp_wo_skel_roc,
+        rp_wo_skel_roc=rp_wo_skel_roc,
         eft_wo_skel_roc=eft_wo_skel_roc,
         gsp_wo_skel_graphs=gsp_wo_skel_graphs,
         ges_wo_skel_graphs=ges_wo_skel_graphs,
+        rp_wo_skel_graphs=rp_wo_skel_graphs,
         eft_wo_skel_graphs=eft_wo_skel_graphs,
         true_graphs=true_graphs,
         true_CPDAGs=true_CPDAGs

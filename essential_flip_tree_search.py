@@ -6,7 +6,7 @@ import ges
 import numpy as np
 import networkx as nx
 from networkx.algorithms import tree
-
+from scipy.stats import chi2_contingency
 
 
 # Given a subtree (as a list of vertices)
@@ -229,6 +229,24 @@ def emp_edge_weight(node1, node2, data):
     var_node2 = data[:, node2].var()
     return(((1/2)*np.log(var/var_node2)))
 
+# Function for computing empirical mutual information:
+def calc_MI(data, x, y, bins):
+    c_xy = np.histogram2d(data[:, x], data[:, y], bins)[0] + np.full([bins, bins], 0.0000000001, float)
+    g, p, dof, expected = chi2_contingency(c_xy, lambda_="log-likelihood")
+    mi = 0.5 * g / c_xy.sum()
+    return mi
+
+def MI_MWST(data, bins=5, method='kruskal'):
+    n = data.shape[1]
+    G_data = nx.Graph()
+    for i in range(n):
+        for j in range(i):
+            G_data.add_edge(j, i, weight=-calc_MI(data, j, i, bins))
+    min_weight_tree_data = tree.minimum_spanning_edges(G_data, algorithm=method, data=False)
+    min_weight_tree_edge_list = [list(e) for e in min_weight_tree_data]
+    ig_min_weight_tree = to_igraph(min_weight_tree_edge_list, n)
+    return (ig_min_weight_tree)
+
 # Function for producing minimum weight spanning tree. Valid methods are 'kruskal, 'prim', or 'boruvka'.
 # Default method is 'kruskal'.
 def min_weight_tree(data, method='kruskal'):
@@ -254,7 +272,8 @@ def min_weight_tree(data, method='kruskal'):
 def eft(data, skeleton = "none"):
     bic = ges.scores.GaussObsL0Pen(data)
     if skeleton == "none":
-        learned_tree, learned_score = essential_flip_search(min_weight_tree(data), bic)
+        # learned_tree, learned_score = essential_flip_search(min_weight_tree(data), bic)
+        learned_tree, learned_score = essential_flip_search(MI_MWST(data), bic)
     else:
         learned_tree, learned_score = essential_flip_search(skeleton, bic)
     return learned_tree, learned_score
@@ -293,7 +312,7 @@ def eft(data, skeleton = "none"):
 #
 # print(estimate)
 #
-# # Run esential_flip_search with the same BIC score
+# # Run essential_flip_search with the same BIC score
 # # bic = ges.scores.GaussObsL0Pen(data)
 # # essential_flip_estimate, essential_flip_score = essential_flip_search(g, bic)
 # essential_flip_estimate, essential_flip_score = eft(data, g)
