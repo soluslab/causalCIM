@@ -120,7 +120,7 @@ for e_idx in range(num_exp):
 
     #EFTSearch with true skeleton given as background knowledge
     bic = ges.scores.GaussObsL0Pen(samples)
-    eft_graph, eft_score = essential_flip_search(skel, bic)
+    eft_graph, eft_score = essential_flip_search(skel, samples)
     eft_adj = eft_graph.get_adjacency()
     eft_cd_dag = cdag.DAG.from_amat(eft_adj)
     eft_cpdag = eft_cd_dag.cpdag().to_amat()[0].astype(bool)

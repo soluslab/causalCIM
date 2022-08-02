@@ -7,6 +7,9 @@ import numpy as np
 import networkx as nx
 from networkx.algorithms import tree
 from scipy.stats import chi2_contingency
+import pandas as pd
+from pgmpy.estimators import BicScore
+from pgmpy.models import BayesianModel
 
 
 # Given a subtree (as a list of vertices)
@@ -183,8 +186,8 @@ def reverse_subtree(input_graph, input_subtree, check_input = True):
             return_graph.add_edges([(edge[1], edge[0])])
     return return_graph
 
-# This function should be renamed
-def essential_flip_search(input_skeleton, input_score):
+# Greedy search phase of EFT
+def essential_flip_search(input_skeleton, data, datatype="Gaussian", bins = 5):
     if input_skeleton.is_directed():
         ske = input_skeleton.copy()
         ske.to_undirected()
@@ -193,16 +196,33 @@ def essential_flip_search(input_skeleton, input_score):
     st = all_subtrees(ske)
     gd = ske.copy()
     gd.to_directed(mode='random')
-    max_score = input_score.full_score(gd.get_adjacency_sparse().toarray())
-    while True:
-        potential_moves = [reverse_subtree(gd, i) for i in st if validate_essential_flip(gd, i)]
-        scores = [input_score.full_score(t.get_adjacency_sparse().toarray()) for t in potential_moves]
-        ind = np.argmax(scores)
-        if scores[ind] > max_score:
-            gd = potential_moves[ind]
-            max_score = scores[ind]
-        else:
-            break 
+    if datatype == "Discretize":
+        df = pd.DataFrame(data)
+        for i in range(len(df.columns)):
+            df[i] = pd.cut(df[i], bins=bins)
+        input_score = BicScore(df)
+        max_score = input_score.score(BayesianModel(gd.get_edgelist()))
+        while True:
+            potential_moves = [reverse_subtree(gd, i) for i in st if validate_essential_flip(gd, i)]
+            scores = [input_score.score(BayesianModel(t.get_edgelist())) for t in potential_moves]
+            ind = np.argmax(scores)
+            if scores[ind] > max_score:
+                gd = potential_moves[ind]
+                max_score = scores[ind]
+            else:
+                break
+    else:
+        input_score = ges.scores.GaussObsL0Pen(data)
+        max_score = input_score.full_score(gd.get_adjacency_sparse().toarray())
+        while True:
+            potential_moves = [reverse_subtree(gd, i) for i in st if validate_essential_flip(gd, i)]
+            scores = [input_score.full_score(t.get_adjacency_sparse().toarray()) for t in potential_moves]
+            ind = np.argmax(scores)
+            if scores[ind] > max_score:
+                gd = potential_moves[ind]
+                max_score = scores[ind]
+            else:
+                break
     return gd, max_score
 
 # Convert a graph given as a list of edges to an igraph object
@@ -269,13 +289,13 @@ def min_weight_tree(data, method='kruskal'):
     return(ig_min_weight_tree)
 
 # EFT causal discovery algorithm
-def eft(data, skeleton = "none", bins = 5):
-    bic = ges.scores.GaussObsL0Pen(data)
+def eft(data, skeleton = "none", bins = 5, datatype = "Gaussian"):
+    # bic = ges.scores.GaussObsL0Pen(data)
     if skeleton == "none":
         # learned_tree, learned_score = essential_flip_search(min_weight_tree(data), bic)
-        learned_tree, learned_score = essential_flip_search(MI_MWST(data, bins), bic)
+        learned_tree, learned_score = essential_flip_search(MI_MWST(data, bins), data, datatype=datatype, bins=bins)
     else:
-        learned_tree, learned_score = essential_flip_search(skeleton, bic)
+        learned_tree, learned_score = essential_flip_search(skeleton, data, datatype=datatype, bins=bins)
     return learned_tree, learned_score
 
 # # Here is some test code
