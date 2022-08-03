@@ -28,7 +28,6 @@ df = pd.read_csv('sachs_obs_data.csv', delimiter = ',')
 
 # Convert to an numpy array
 sachs_samples = df.values
-sachs_samples = df.values
 
 # The true graph with variable ordering Raf, Mek, PLCg, PIP2, PIP3, Erk, Akt, PKA, PKC, p38, JNK.
 true_graph = np.array([
@@ -56,14 +55,14 @@ true_skel = true_cpdag + true_cpdag.T
 # Collecting data
 ges_w_skel_acc = np.empty(1, float)
 ges_wo_skel_acc = np.empty(1, float)
-gsp_wo_skel_acc = np.empty(1, float)
+gsp_wo_skel_acc = np.empty([1, 9], float)
 eft_w_skel_acc = np.empty(1, float)
 eft_wo_skel_acc = np.empty([1, 10], float)
 deft_wo_skel_acc = np.empty([1, 10], float)
 rp_wo_skel_acc = np.empty([1, 10], float)
 ges_w_skel_roc = np.empty([1, 2], float)
 ges_wo_skel_roc = np.empty([1, 2], float)
-gsp_wo_skel_roc = np.empty([1, 2], float)
+gsp_wo_skel_roc = np.empty([9, 2], float)
 eft_w_skel_roc = np.empty([1, 2], float)
 eft_wo_skel_roc = np.empty([10, 2], float)
 deft_wo_skel_roc = np.empty([10, 2], float)
@@ -71,7 +70,7 @@ rp_wo_skel_roc = np.empty([10, 2], float)
 gtruth_graph = np.empty((1, 11, 11), bool)
 ges_w_skel_graph = np.empty((1, 11, 11), bool)
 ges_wo_skel_graph = np.empty((1, 11, 11), bool)
-gsp_wo_skel_graph = np.empty((1, 11, 11), bool)
+gsp_wo_skel_graph = np.empty((9, 11, 11), bool)
 eft_w_skel_graph = np.empty((1, 11, 11), bool)
 eft_wo_skel_graph = np.empty((10, 11, 11), bool)
 deft_wo_skel_graph = np.empty((10, 11, 11), bool)
@@ -182,18 +181,21 @@ ges_wo_skel_roc[0][1] = false_pos(ges_graph.astype(bool), true_cpdag)
 ges_wo_skel_graph[0] = ges_graph
 
 # Run GreedySP without skeleton as background knowledge
-suffstat = cdag.partial_correlation_suffstat(sachs_samples)
-ci_tester = MemoizedCI_Tester(partial_correlation_test, suffstat, alpha=0.05)
-gsp_graph = cdag.gsp(set(range(11)), ci_tester)
-gsp_cpdag = gsp_graph.cpdag().to_amat()[0].astype(bool)
-gsp_wo_skel_acc[0] = struct_hamming_sim(gsp_cpdag, true_cpdag)
-gsp_wo_skel_roc[0][0] = true_pos(gsp_cpdag, true_cpdag)
-gsp_wo_skel_roc[0][1] = false_pos(gsp_cpdag, true_cpdag)
-gsp_wo_skel_graph[0] = gsp_cpdag
+alphas = [0.05, 0.025, 0.01, 0.005, 0.0025, 0.001, 0.0005, 0.00025, 0.0001]
+for e_idx in range(9):
+    idx = int(e_idx)
+    suffstat = cdag.partial_correlation_suffstat(sachs_samples)
+    ci_tester = MemoizedCI_Tester(partial_correlation_test, suffstat, alpha=alphas[idx])
+    gsp_graph = cdag.gsp(set(range(11)), ci_tester)
+    gsp_cpdag = gsp_graph.cpdag().to_amat()[0].astype(bool)
+    gsp_wo_skel_acc[0][idx] = struct_hamming_sim(gsp_cpdag, true_cpdag)
+    gsp_wo_skel_roc[idx][0] = true_pos(gsp_cpdag, true_cpdag)
+    gsp_wo_skel_roc[idx][1] = false_pos(gsp_cpdag, true_cpdag)
+    gsp_wo_skel_graph[idx] = gsp_cpdag
 
 
 np.savez(
-    "sachs_results_disc.npz",
+    "sachs_results.npz",
     ges_w_skel_acc=ges_w_skel_acc,
     ges_wo_skel_acc=ges_wo_skel_acc,
     gsp_wo_skel_acc=gsp_wo_skel_acc,
