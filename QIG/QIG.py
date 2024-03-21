@@ -89,26 +89,3 @@ class QIG:
         [Amat, bmat] = self.inequalities
 
         return opt.linprog(c_vec, A_ub=Amat, b_ub=bmat, method=opt_method)
-
-
-
-# aQIG = QIG(simfakeidata, fakeints)
-
-# print('data: \n ', aQIG.data[0])
-# print('targets: \n', aQIG.targets)
-# print('skeleton: \n', aQIG.skeleton)
-# print('leaf targets: \n', aQIG.leaf_targets)
-# print('coordinates: \n', aQIG.coordinates)
-# print('BIC_cim: \n', aQIG.BIC_cim)
-# print('Inequalities: \n', aQIG.inequalities)
-# print('est DAG:\n', aQIG.linsolv())
-# print('true adjmat:\n', true_adjmat)
-# print('identity:\n', np.eye(3))
-# s = aQIG.skeleton[3]
-# adjust = s - np.eye(4)
-# print(adjust)
-# for i in range(4):
-#     print(sum((adjust[:,i])))
-#
-# print('leaves:\n', getLeaves(adjust))
-
