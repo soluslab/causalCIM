@@ -116,7 +116,6 @@ def getPatternFromAdjMat(graph):
     for i in range(n):
         Lgraph = [j for j in range(n) if graph[j][i] == 1]
         Lgraph.remove(i)
-        # print('Lgraph', i, Lgraph)
 
         if len(Lgraph) > 1:
             for k in Lgraph:
