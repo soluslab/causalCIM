@@ -4,7 +4,7 @@ from QIG import (
     QIG
 )
 
-obs_data = pd.read_csv('~liamsolus/Dropbox/Research/alg-stat/graphical-models/geometric_QIG/QIG_code/sachs_exp/sachs_obs_data.csv')
+obs_data = pd.read_csv('~sachs_exp/sachs_obs_data.csv')
 
 sachsQIG = QIG(obs_data, [[]])
 sachsQIGcim = sachsQIG.linsolv()
@@ -24,11 +24,11 @@ np.savez(
 )
 
 # With interventions at {0: obs, 1: Akt, 2: PKC, 3: PIP2, 4: MeK, 5: PIP3}
-int_data1 = pd.read_csv('~liamsolus/Dropbox/Research/alg-stat/graphical-models/geometric_QIG/QIG_code/sachs_exp/2-sachs_Akt.csv')
-int_data2 = pd.read_csv('~liamsolus/Dropbox/Research/alg-stat/graphical-models/geometric_QIG/QIG_code/sachs_exp/3-sachs_PKC.csv')
-int_data3 = pd.read_csv('~liamsolus/Dropbox/Research/alg-stat/graphical-models/geometric_QIG/QIG_code/sachs_exp/4-sachs_PIP2.csv')
-int_data4 = pd.read_csv('~liamsolus/Dropbox/Research/alg-stat/graphical-models/geometric_QIG/QIG_code/sachs_exp/5-sachs_MEK.csv')
-int_data5 = pd.read_csv('~liamsolus/Dropbox/Research/alg-stat/graphical-models/geometric_QIG/QIG_code/sachs_exp/6-sachs_PIP3.csv')
+int_data1 = pd.read_csv('~sachs_exp/2-sachs_Akt.csv')
+int_data2 = pd.read_csv('~sachs_exp/3-sachs_PKC.csv')
+int_data3 = pd.read_csv('~sachs_exp/4-sachs_PIP2.csv')
+int_data4 = pd.read_csv('~sachs_exp/5-sachs_MEK.csv')
+int_data5 = pd.read_csv('~sachs_exp/6-sachs_PIP3.csv')
 
 
 datasets = [obs_data, int_data1, int_data2, int_data3, int_data4, int_data5]
