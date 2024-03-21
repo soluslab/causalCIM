@@ -13,29 +13,6 @@ from QIGTree_hyperplanes import (
 )
 import time
 
-#############################################
-
-
-def getTimeToo(start):  # This function is not needed, it's just for time keeping
-    tiempo = time.time() - start
-    hours = str(int(tiempo // 3600))
-
-    if (tiempo // 60) % 60 <= 9:
-        minutes = "0" + str(int((tiempo // 60) % 60))
-    else:
-        minutes = str(int((tiempo // 60) % 60))
-
-    if np.floor(tiempo) % 60 <= 9:
-        seconds = "0" + str(int(np.floor(tiempo) % 60))
-    else:
-        seconds = str(int(np.floor(tiempo) % 60))
-
-    time_vec = [int(hours), int(minutes), int(seconds)]
-
-    return time_vec
-    # return str(hours) + ":" + str(minutes) + ":" + str(seconds)
-
-################################################################
 
 ########################################################
 ### Estimating a skeleton (that is a tree) from data ###
@@ -116,19 +93,6 @@ def transformToCIM(BIC, coords):
     num_nodes = np.log2(p).astype(int)
     bigCoords = [list(C) for C in powerset(range(num_nodes))]
 
-    ######### Projection not needed afterall? #################
-    # perpProjBIC = np.zeros(len(BIC), float)
-    # for i in range(p):
-    #     S = bigCoords[i]
-    #     s = len(S)
-    #     if s > 1:
-    #         perpProjBIC[i] = sum([BIC[j] for j in S]) - s
-    #     else:
-    #         perpProjBIC[i] = BIC[i]
-    #
-    # adjusted_bic = BIC - perpProjBIC
-    ############################################################
-
     imsetBIC = [
         sum(
             [(-1)**(len(coords[j]) - len(bigCoords[i]))*(1 - BIC[i]) for i in range(len(bigCoords)) if
@@ -140,9 +104,7 @@ def transformToCIM(BIC, coords):
     return imsetBIC
 
 def getBIC(D, coords):
-    # start2 = time.time()
     BIC = getStandardImsetFunctional(D)
-    # print('fast?', getTimeToo(start2))
     return transformToCIM(BIC, coords)
 
 
@@ -161,9 +123,7 @@ def CIMlinsolv(data, skeleton=None, skel_method='kruskal', skel_bins=5, opt_meth
 
     [Amat, bmat] = getInequalities(skeleton, skel_coords)
 
-    # start1 = time.time()
     c_vec = [-x for x in getBIC(data, skel_coords)]
-    # print(getTimeToo(start1))
 
     solution = opt.linprog(c_vec, A_ub=Amat, b_ub=bmat, method=opt_method)
 
