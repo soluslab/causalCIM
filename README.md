@@ -10,8 +10,8 @@ The EFT algorithm, contained in essential_flip_tree_search.py, uses combinatoria
 This method is a simplex-type algorithm. 
 Input data for EFT should be observational data only. 
 
-QIG, with main file QIG.py, provides more general methods.  
+QIG, with main file QIG.py, provides more general methods.
 It supports either observational data or a combination of observational and interventional data. 
 QIG identifies the defining inequalities of the CIM polytope, which can be used for general integer linear programming techniques. 
 QIG.py may be used to create a QIG object which stores the estimated tree skeleton, the defining inequalities of the CIM polytope and the data vector for linear optimization methods for Gaussian data. 
-A QIG object has a the associated method linsolv which returns the BIC optimal DAG model via a standard interior point method solver.
+A QIG object has the associated method linsolv which returns the BIC optimal DAG model via a standard interior point method solver.
