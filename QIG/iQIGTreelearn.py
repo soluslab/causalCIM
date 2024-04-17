@@ -60,7 +60,7 @@ def idatavec(data, ints):
 
             datavec += [
                 sum([
-                        (1/2)*sum([
+                        -(1/2)*sum([
                             np.matmul(np.matmul(x, fill(np.linalg.inv(SA_poolZcomp), A, m)), np.transpose(x))
                             for x in data[i]
                         ])
@@ -68,7 +68,7 @@ def idatavec(data, ints):
                     for i in Zcomp])
                 +
                 sum([
-                    (1/2)*sum([
+                    -(1/2)*sum([
                         np.matmul(np.matmul(x, fill(np.linalg.inv(Sk_As[i]), A, m)), np.transpose(x))
                     for x in data[i]])
                     - (num_int_samps[i] / 2)*np.log(np.linalg.det(Sk_As[i]))
